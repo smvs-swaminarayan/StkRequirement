@@ -418,6 +418,22 @@ export async function deleteCategory(id: number, actor?: ActorInfo) {
     updatedAt: serverTimestamp(),
   });
 
+  try {
+    const items = await executeDbQuery({ action: "getDocs", collection: "items" });
+    const matchingItems = items.filter((i: any) => String(i.categoryId) === String(id));
+    for (const item of matchingItems) {
+      await updateDoc(doc(db, "items", item.id), {
+        active: false,
+        deletedAt: serverTimestamp(),
+        deletedById: actor?.actorId ?? null,
+        deletedByName: actor?.actorName ?? null,
+        updatedAt: serverTimestamp(),
+      });
+    }
+  } catch (e) {
+    console.error("Failed to soft-delete items for category:", e);
+  }
+
   await createAuditLog(
     {
       action: "CATEGORY_SOFT_DELETED",
@@ -427,8 +443,8 @@ export async function deleteCategory(id: number, actor?: ActorInfo) {
     },
     actor,
   );
-  emitFirestoreRefresh(["items"]);
-    void syncPublicCatalog();
+  emitFirestoreRefresh(["categories", "items"]);
+  void syncPublicCatalog();
 }
 
 export async function createItem(
