@@ -85,7 +85,13 @@ export function LoginScreen({ nextPath }: { nextPath?: string }) {
       await signInWithUsername(loginForm.username, loginForm.password);
       toast.success("Welcome back!");
       window.location.assign(target);
-    } catch (error) {
+    } catch (error: any) {
+      const msg = String(error?.message || error || "");
+      if (msg.includes("Server Action") || msg.includes("not found")) {
+        toast.info("Updating version... Reloading page.");
+        window.location.reload();
+        return;
+      }
       toast.error(getFirebaseErrorMessage(error, "Unable to sign in."));
       setSubmitting(false);
     }
