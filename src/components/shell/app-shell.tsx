@@ -253,29 +253,17 @@ export function AppShell({
           {/* Spacer */}
           <div className="flex-1" />
 
-          {/* Role badge */}
-          <div className="hidden items-center gap-2 text-xs text-white/70 md:flex">
-            <span className="rounded-md bg-[var(--primary)]/20 px-2.5 py-1 font-semibold text-[var(--primary)]">
-              {getRoleLabel(optimisticRole ?? workspaceProfile)}
-            </span>
-          </div>
-
           {/* Account & Role Switcher dropdown with Hover support */}
           <div className="relative group/user py-1">
             <button
               type="button"
               onClick={() => setAccountMenuOpen(!accountMenuOpen)}
-              className="flex items-center gap-2 rounded-full border border-white/20 bg-white/10 p-1 pr-3 text-sm text-white transition hover:bg-white/20 hover:border-white/40"
+              className="flex items-center justify-center rounded-full transition hover:scale-105 active:scale-95"
+              title={`${profile?.displayName || "Account"} (${getRoleLabel(optimisticRole ?? workspaceProfile)})`}
             >
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-xs font-black text-[#09090b] shadow-md ring-2 ring-white/30">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-xs font-black text-[#09090b] shadow-md ring-2 ring-white/40 hover:ring-[var(--primary)] transition">
                 {(profile?.displayName || profile?.username || "U").trim().charAt(0).toUpperCase()}
               </div>
-              <span className="hidden font-semibold max-w-[120px] truncate sm:block">
-                {profile?.displayName ?? "Account"}
-              </span>
-              <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-[11px] font-bold text-amber-300 border border-amber-400/40">
-                {getRoleLabel(optimisticRole ?? workspaceProfile)} ▾
-              </span>
             </button>
 
             {/* Dropdown menu: Opens on hover OR click */}

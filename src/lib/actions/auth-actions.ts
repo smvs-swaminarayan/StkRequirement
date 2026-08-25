@@ -5,43 +5,47 @@ import { executeDbQuery } from "@/lib/sqlite-action";
 import { normalizeUsername } from "@/lib/utils";
 
 export async function loginAction(username: string, passwordString: string) {
-  const usernameKey = normalizeUsername(username);
-  
-  const users = await executeDbQuery({
-    action: "getDocs",
-    collection: "users",
-    constraints: [{ field: "usernameLower", op: "==", value: usernameKey }]
-  });
-  
-  const user = users && users[0];
-  if (!user) {
-    throw new Error("Username does not exist.");
+  try {
+    const usernameKey = normalizeUsername(username);
+    
+    const users = await executeDbQuery({
+      action: "getDocs",
+      collection: "users",
+      constraints: [{ field: "usernameLower", op: "==", value: usernameKey }]
+    });
+    
+    const user = users && users[0];
+    if (!user) {
+      return { success: false, error: "Username does not exist." };
+    }
+    
+    if (user.is_deleted === 1 || user.deletedAt) {
+      return { success: false, error: "This account is deactivated." };
+    }
+    
+    if (user.password !== passwordString) {
+      return { success: false, error: "Password is wrong." };
+    }
+    
+    const cookieStore = await cookies();
+    cookieStore.set("auth_session", user.uid.toString(), {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      path: "/",
+    });
+    
+    await executeDbQuery({
+      action: "updateDoc",
+      collection: "users",
+      id: user.uid,
+      data: { lastLoginAt: new Date().toISOString() }
+    });
+    
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Failed to sign in." };
   }
-  
-  if (user.is_deleted === 1 || user.deletedAt) {
-    throw new Error("This account is deactivated.");
-  }
-  
-  if (user.password !== passwordString) {
-    throw new Error("Password is wrong.");
-  }
-  
-  const cookieStore = await cookies();
-  cookieStore.set("auth_session", user.uid.toString(), {
-    httpOnly: true,
-    secure: false,
-    sameSite: "lax",
-    path: "/",
-  });
-  
-  await executeDbQuery({
-    action: "updateDoc",
-    collection: "users",
-    id: user.uid,
-    data: { lastLoginAt: new Date().toISOString() }
-  });
-  
-  return { success: true };
 }
 
 export async function logoutAction() {

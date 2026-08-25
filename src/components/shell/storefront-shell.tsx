@@ -315,15 +315,12 @@ export function StorefrontShell({
                 <button
                   type="button"
                   onClick={() => setAccountMenuOpen(!accountMenuOpen)}
-                  className="flex items-center gap-2 rounded-full border border-white/20 bg-white/10 p-1 pr-2.5 text-sm text-white transition hover:bg-white/20 hover:border-white/40"
+                  className="flex items-center justify-center rounded-full transition hover:scale-105 active:scale-95"
+                  title={`${profile?.displayName || "Account"} (${getRoleLabel(optimisticRole ?? workspaceProfile)})`}
                 >
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-xs font-black text-[#09090b] shadow-md ring-2 ring-white/30">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-xs font-black text-[#09090b] shadow-md ring-2 ring-white/40 hover:ring-[var(--primary)] transition">
                     {(profile?.displayName || profile?.username || "U").trim().charAt(0).toUpperCase()}
                   </div>
-                  <span className="hidden max-w-[120px] truncate font-bold text-xs sm:block">
-                    {profile?.displayName ?? "Account"}
-                  </span>
-                  <ChevronDown className="h-3.5 w-3.5 transition duration-300 group-hover/user:rotate-180" />
                 </button>
 
                 {/* Dropdown menu: Opens on hover OR click */}

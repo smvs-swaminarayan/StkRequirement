@@ -432,12 +432,7 @@ export function StorefrontPage() {
                           setDetailActiveImage(0);
                         }
                       }}
-                      className={cn(
-                        "flex h-10 w-full items-center justify-center rounded-[var(--radius-md)] px-3 text-xs font-bold transition-all shadow-sm active:scale-[0.98]",
-                        isOutOfStock 
-                          ? "bg-[var(--danger)] text-white hover:bg-[var(--danger-dark)]" 
-                          : "bg-[var(--primary)] text-white hover:bg-[var(--primary-dark)]"
-                      )}
+                      className="flex h-10 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--primary)] px-3 text-xs font-bold text-white shadow-sm transition-all hover:bg-[var(--primary-dark)] active:scale-[0.98]"
                     >
                       {isOutOfStock ? "Request Item" : "Buy Item"}
                     </button>

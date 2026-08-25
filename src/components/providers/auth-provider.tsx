@@ -132,10 +132,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signInWithUsername = async (username: string, password: string) => {
+    const res = await loginAction(username, password);
+    if (!res?.success) {
+      throw new Error(res?.error || "Failed to sign in.");
+    }
     if (typeof window !== "undefined") {
       window.sessionStorage.setItem("stk_tab_session_active", "1");
     }
-    await loginAction(username, password);
     await fetchProfile();
   };
 
