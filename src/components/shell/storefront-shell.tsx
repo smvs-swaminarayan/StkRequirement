@@ -435,8 +435,6 @@ export function StorefrontShell({
                         </button>
                       </div>
                     </div>
-                  </>
-                ) : null}
               </div>
             ) : (
               /* Login/Sign up buttons for anonymous users */
