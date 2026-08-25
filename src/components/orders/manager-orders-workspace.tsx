@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
 import { Panel } from "@/components/ui/panel";
+import { Pagination } from "@/components/ui/pagination";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useWorkspaceData } from "@/hooks/use-workspace-data";
@@ -32,6 +33,8 @@ export function ManagerOrdersWorkspace() {
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
   const [statusFilter, setStatusFilter] = useState<(typeof orderStatuses)[number]>("ALL");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12);
   const [submitting, setSubmitting] = useState(false);
   const [selectedOrderModal, setSelectedOrderModal] = useState<OrderRecord | null>(null);
   const [decisionState, setDecisionState] = useState<{
@@ -71,12 +74,18 @@ export function ManagerOrdersWorkspace() {
       return matchesStatus && matchesSearch;
     });
 
-    return nextOrders.sort((left, right) => {
+    const sorted = nextOrders.sort((left, right) => {
       const rightValue = toDate(right.updatedAt || right.createdAt || right.date)?.getTime() ?? 0;
       const leftValue = toDate(left.updatedAt || left.createdAt || left.date)?.getTime() ?? 0;
       return rightValue - leftValue;
     });
+    return sorted;
   }, [deferredSearch, orders, statusFilter]);
+
+  const paginatedOrders = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredOrders.slice(start, start + pageSize);
+  }, [filteredOrders, page, pageSize]);
 
   const openDecision = (orderId: string, itemName: string, nextStatus: OrderStatus) => {
     setDecisionNote("");
@@ -155,97 +164,77 @@ export function ManagerOrdersWorkspace() {
           </div>
 
           {filteredOrders.length ? (
-            <div className="mt-4 grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {filteredOrders.map((order) => {
-                const orderItem = items.find((item) => item.id === order.itemId);
-                const isDelivered = order.status === "DELIVERED";
+            <>
+              <div className="mt-4 grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {paginatedOrders.map((order) => {
+                  const orderItem = items.find((item) => item.id === order.itemId);
+                  const isDelivered = order.status === "DELIVERED";
 
-                return (
-                  <article
-                    key={order.id}
-                    onClick={() => setSelectedOrderModal(order)}
-                    className="relative flex flex-col justify-between rounded-xl border border-[var(--border)] bg-white p-4 shadow-sm hover:shadow-md transition cursor-pointer overflow-hidden group"
-                  >
-                    <div>
-                      {/* Top Header */}
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--paper)]">
-                            {orderItem?.imageUrl ? (
-                              <img
-                                src={orderItem.imageUrl}
-                                alt={order.itemName}
-                                className="h-full w-full object-cover"
-                                style={getItemImageCropStyle(orderItem.imageCrop)}
-                              />
-                            ) : (
-                              <EmptyOrderThumb />
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--ink-soft)] truncate">
-                                {order.categoryName}
-                              </p>
-                              {orderItem?.productId ? (
-                                <span className="rounded bg-[var(--paper)] border border-[var(--border)] px-1.5 py-0.2 text-[9px] font-bold text-[var(--ink-light)]">
-                                  ID: {orderItem.productId}
-                                </span>
-                              ) : null}
+                  return (
+                    <article
+                      key={order.id}
+                      onClick={() => setSelectedOrderModal(order)}
+                      className="relative flex flex-col justify-between rounded-xl border border-[var(--border)] bg-white p-4 shadow-sm hover:shadow-md transition cursor-pointer overflow-hidden group"
+                    >
+                      <div>
+                        {/* Top Header */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--paper)]">
+                              {orderItem?.imageUrl ? (
+                                <img
+                                  src={orderItem.imageUrl}
+                                  alt={order.itemName}
+                                  className="h-full w-full object-cover"
+                                  style={getItemImageCropStyle(orderItem.imageCrop)}
+                                />
+                              ) : (
+                                <EmptyOrderThumb />
+                              )}
                             </div>
-                            <h4 className="text-sm font-bold text-[var(--ink)] truncate group-hover:text-[var(--primary)] transition-colors">
-                              {order.itemName}
-                            </h4>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--ink-soft)] truncate">
+                                  {order.categoryName}
+                                </p>
+                                {orderItem?.productId ? (
+                                  <span className="rounded bg-[var(--paper)] border border-[var(--border)] px-1.5 py-0.2 text-[9px] font-bold text-[var(--ink-light)]">
+                                    ID: {orderItem.productId}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <h4 className="text-sm font-bold text-[var(--ink)] truncate group-hover:text-[var(--primary)] transition-colors">
+                                {order.itemName}
+                              </h4>
+                            </div>
+                          </div>
+                          <StatusBadge status={order.status} />
+                        </div>
+
+                        {/* Info Pills */}
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                          <div className="rounded-lg bg-[var(--paper)] p-2 border border-[var(--border)]">
+                            <span className="text-[10px] uppercase font-bold text-[var(--ink-soft)] block">Qty</span>
+                            <span className="font-bold text-[var(--ink)]">{formatQty(order.qty)}</span>
+                          </div>
+                          <div className="rounded-lg bg-[var(--paper)] p-2 border border-[var(--border)] truncate">
+                            <span className="text-[10px] uppercase font-bold text-[var(--ink-soft)] block">Requester</span>
+                            <span className="font-bold text-[var(--ink)] truncate block">{order.requestedByName}</span>
                           </div>
                         </div>
-                        <StatusBadge status={order.status} />
+
+                        {/* Requester note snippet */}
+                        {order.notes ? (
+                          <p className="mt-2 text-xs text-[var(--ink-soft)] line-clamp-1 italic bg-amber-500/10 p-1.5 rounded border border-amber-500/20">
+                            "{order.notes}"
+                          </p>
+                        ) : null}
                       </div>
 
-                      {/* Info Pills */}
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                        <div className="rounded-lg bg-[var(--paper)] p-2 border border-[var(--border)]">
-                          <span className="text-[10px] uppercase font-bold text-[var(--ink-soft)] block">Qty</span>
-                          <span className="font-bold text-[var(--ink)]">{formatQty(order.qty)}</span>
-                        </div>
-                        <div className="rounded-lg bg-[var(--paper)] p-2 border border-[var(--border)] truncate">
-                          <span className="text-[10px] uppercase font-bold text-[var(--ink-soft)] block">Requester</span>
-                          <span className="font-bold text-[var(--ink)] truncate block">{order.requestedByName}</span>
-                        </div>
-                      </div>
-
-                      {/* Requester note snippet */}
-                      {order.notes ? (
-                        <p className="mt-2 text-xs text-[var(--ink-soft)] line-clamp-1 italic bg-amber-500/10 p-1.5 rounded border border-amber-500/20">
-                          "{order.notes}"
-                        </p>
-                      ) : null}
-                    </div>
-
-                    {/* Bottom Action Footer */}
-                    <div className="mt-3 pt-3 border-t border-[var(--border)] flex items-center justify-between">
-                      <span className="text-[10px] font-semibold text-[var(--ink-light)]">
-                        {formatDate(order.date || order.createdAt)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedOrderModal(order);
-                        }}
-                        className="inline-flex items-center gap-1 text-xs font-bold text-[var(--primary)] hover:underline"
-                      >
-                        <Eye className="h-3.5 w-3.5" /> Details
-                      </button>
-                    </div>
-
-                    {/* FROSTED BLUR OVERLAY FOR DELIVERED ORDERS */}
-                    {isDelivered && (
-                      <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-[2.5px] rounded-xl flex flex-col items-center justify-center z-10 p-3 text-center transition group-hover:bg-slate-950/55">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500 text-slate-950 text-xs font-extrabold uppercase tracking-wider shadow-lg border border-emerald-400">
-                          <Truck className="h-3.5 w-3.5" /> DELIVERED
-                        </span>
-                        <span className="mt-1.5 text-[11px] font-semibold text-emerald-200">
-                          {formatDate(order.deliveredAt || order.updatedAt)}
+                      {/* Bottom Action Footer */}
+                      <div className="mt-3 pt-3 border-t border-[var(--border)] flex items-center justify-between">
+                        <span className="text-[10px] font-semibold text-[var(--ink-light)]">
+                          {formatDate(order.date || order.createdAt)}
                         </span>
                         <button
                           type="button"
@@ -253,16 +242,48 @@ export function ManagerOrdersWorkspace() {
                             e.stopPropagation();
                             setSelectedOrderModal(order);
                           }}
-                          className="mt-2.5 text-xs font-bold text-white underline hover:text-emerald-300"
+                          className="inline-flex items-center gap-1 text-xs font-bold text-[var(--primary)] hover:underline"
                         >
-                          View Full Details
+                          <Eye className="h-3.5 w-3.5" /> Details
                         </button>
                       </div>
-                    )}
-                  </article>
-                );
-              })}
-            </div>
+
+                      {/* FROSTED BLUR OVERLAY FOR DELIVERED ORDERS */}
+                      {isDelivered && (
+                        <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-[2.5px] rounded-xl flex flex-col items-center justify-center z-10 p-3 text-center transition group-hover:bg-slate-950/55">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500 text-slate-950 text-xs font-extrabold uppercase tracking-wider shadow-lg border border-emerald-400">
+                            <Truck className="h-3.5 w-3.5" /> DELIVERED
+                          </span>
+                          <span className="mt-1.5 text-[11px] font-semibold text-emerald-200">
+                            {formatDate(order.deliveredAt || order.updatedAt)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedOrderModal(order);
+                            }}
+                            className="mt-2.5 text-xs font-bold text-white underline hover:text-emerald-300"
+                          >
+                            View Full Details
+                          </button>
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
+              <div className="mt-4">
+                <Pagination
+                  currentPage={page}
+                  totalItems={filteredOrders.length}
+                  pageSize={pageSize}
+                  onPageChange={setPage}
+                  onPageSizeChange={setPageSize}
+                  pageSizeOptions={[8, 12, 24, 48]}
+                />
+              </div>
+            </>
           ) : (
             <div className="mt-4">
               <EmptyState

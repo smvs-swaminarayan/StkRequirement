@@ -51,6 +51,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [bootstrapReady, setBootstrapReady] = useState(true);
 
   const fetchProfile = useCallback(async () => {
+    if (typeof window !== "undefined") {
+      const isTabActive = window.sessionStorage.getItem("stk_tab_session_active");
+      if (!isTabActive) {
+        setProfile(null);
+        setLoading(false);
+        await logoutAction().catch(() => {});
+        return;
+      }
+    }
+
     try {
       const user = await getMeAction();
       setProfile(user as AppUserProfile | null);

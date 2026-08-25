@@ -562,7 +562,12 @@ export function MastersView() {
                       </tbody>
                     </table>
                   </div>
-                  <Pagination currentPage={categoryPage} totalPages={totalCategoryPages} onPageChange={setCategoryPage} />
+                  <Pagination
+    currentPage={categoryPage}
+    totalItems={categories.length}
+    pageSize={ITEMS_PER_PAGE}
+    onPageChange={setCategoryPage}
+  />
                   </>
                 ) : (
                   <div className="mt-6">
@@ -1053,7 +1058,12 @@ export function MastersView() {
                     </tbody>
                   </table>
                 </div>
-                <Pagination currentPage={itemPage} totalPages={totalItemPages} onPageChange={setItemPage} />
+                <Pagination
+    currentPage={itemPage}
+    totalItems={filteredItems.length}
+    pageSize={ITEMS_PER_PAGE}
+    onPageChange={setItemPage}
+  />
                 </>
               ) : (
                 <div className="mt-6">
@@ -1358,7 +1368,12 @@ export function MastersView() {
                     </tbody>
                   </table>
                 </div>
-                <Pagination currentPage={stockPage} totalPages={totalStockPages} onPageChange={setStockPage} />
+                <Pagination
+    currentPage={stockPage}
+    totalItems={filteredStockEntries.length}
+    pageSize={ITEMS_PER_PAGE}
+    onPageChange={setStockPage}
+  />
                 </>
               ) : (
                 <div className="mt-6">

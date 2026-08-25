@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   Boxes,
   ChevronDown,
+  ChevronRight,
   ClipboardList,
   History,
   LayoutDashboard,
@@ -18,7 +19,12 @@ import {
   ShoppingCart,
   Users,
   X,
-  User,
+  ChevronLeft,
+  Settings,
+  HelpCircle,
+  FolderTree,
+  FileSpreadsheet,
+  Package,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
@@ -32,68 +38,112 @@ import { cn } from "@/lib/utils";
 type NavItem = {
   href: string;
   label: string;
+  badgeColor?: string;
   icon: React.ComponentType<{ className?: string }>;
-  children?: NavItem[];
+  children?: Array<{
+    href: string;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+  }>;
 };
 
-type NavSection = {
-  title: string;
-  items: NavItem[];
-};
-
-function buildNavSections(activeRole: Role | null) {
+function buildNavSections(activeRole: Role | null): NavItem[] {
   if (activeRole === "SUPER_ADMIN") {
     return [
       {
-        title: "Workspace",
-        items: [
-          { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-          { href: "/orders", label: "Orders", icon: ClipboardList },
-          { href: "/requests", label: "Requests", icon: MessageSquare },
-        ],
+        href: "/dashboard",
+        label: "Dashboard",
+        badgeColor: "bg-blue-600",
+        icon: LayoutDashboard,
       },
       {
-        title: "Management",
-        items: [
-          { href: "/masters", label: "Masters", icon: Boxes },
-          { href: "/team", label: "Users Manage", icon: Users },
-          { href: "/reports", label: "Reports Admin", icon: Shield },
-        ],
+        href: "/orders",
+        label: "Orders Management",
+        badgeColor: "bg-rose-500",
+        icon: ClipboardList,
       },
-    ] satisfies NavSection[];
+      {
+        href: "/masters",
+        label: "Masters & Stock",
+        badgeColor: "bg-emerald-600",
+        icon: Boxes,
+      },
+      {
+        href: "/requests",
+        label: "Special Requests",
+        badgeColor: "bg-amber-500",
+        icon: MessageSquare,
+      },
+      {
+        href: "/team",
+        label: "Users Manage",
+        badgeColor: "bg-orange-500",
+        icon: Users,
+      },
+      {
+        href: "/reports",
+        label: "Reports Admin",
+        badgeColor: "bg-purple-600",
+        icon: Shield,
+      },
+    ];
   }
 
   if (activeRole === "LEADER") {
     return [
       {
-        title: "Workspace",
-        items: [
-          { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-          { href: "/orders", label: "Orders", icon: ClipboardList },
-          { href: "/masters", label: "Items & Stock", icon: Boxes },
-          { href: "/requests", label: "Requests", icon: MessageSquare },
-        ],
+        href: "/dashboard",
+        label: "Dashboard",
+        badgeColor: "bg-blue-600",
+        icon: LayoutDashboard,
       },
       {
-        title: "Insight",
-        items: [{ href: "/reports", label: "Reports Leader", icon: Shield }],
+        href: "/orders",
+        label: "Orders Management",
+        badgeColor: "bg-rose-500",
+        icon: ClipboardList,
       },
-    ] satisfies NavSection[];
+      {
+        href: "/masters",
+        label: "Items & Stock",
+        badgeColor: "bg-emerald-600",
+        icon: Boxes,
+      },
+      {
+        href: "/requests",
+        label: "Special Requests",
+        badgeColor: "bg-amber-500",
+        icon: MessageSquare,
+      },
+      {
+        href: "/reports",
+        label: "Reports Leader",
+        badgeColor: "bg-purple-600",
+        icon: Shield,
+      },
+    ];
   }
 
   return [
     {
-      title: "Workspace",
-      items: [
-        { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { href: "/orders/history", label: "My Orders", icon: History },
-      ],
+      href: "/dashboard",
+      label: "Dashboard",
+      badgeColor: "bg-blue-600",
+      icon: LayoutDashboard,
     },
     {
-      title: "Insight",
-      items: [{ href: "/reports", label: "Reports User", icon: Shield }],
+      href: "/orders/history",
+      label: "My Orders",
+      badgeColor: "bg-rose-500",
+      icon: History,
     },
-  ] satisfies NavSection[];
+    {
+      href: "/reports",
+      label: "My Reports",
+      badgeColor: "bg-purple-600",
+      icon: Shield,
+    },
+  ];
 }
 
 export function AppShell({
@@ -109,17 +159,17 @@ export function AppShell({
     activeRole,
     availableRoles,
     profile,
-    verifyUsername,
     forgotPassword,
     setActiveRole,
     signOutCurrentUser,
     workspaceProfile,
   } = useAuth();
-  const { beginNavigation, start, stop } = useAppLoading();
+  const { beginNavigation } = useAppLoading();
   const pathname = usePathname();
   const router = useRouter();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [menuSearch, setMenuSearch] = useState("");
   const [optimisticRole, setOptimisticRole] = useState<Role | null>(activeRole);
   const [forgotModalOpen, setForgotModalOpen] = useState(false);
   const [resetStep, setResetStep] = useState<"username" | "password" | "done">("username");
@@ -135,585 +185,420 @@ export function AppShell({
     setOptimisticRole(activeRole);
   }, [activeRole]);
 
-  const navSections = useMemo(() => buildNavSections(optimisticRole), [optimisticRole]);
-  const allNavItems = useMemo(
-    () => navSections.flatMap((section) => section.items),
-    [navSections],
-  );
+  const navItems = useMemo(() => buildNavSections(optimisticRole), [optimisticRole]);
 
-  useEffect(() => {
-    setMobileNavOpen(false);
-    setAccountMenuOpen(false);
-  }, [pathname]);
+  const filteredNavItems = useMemo(() => {
+    if (!menuSearch.trim()) return navItems;
+    const q = menuSearch.toLowerCase().trim();
+    return navItems.filter((item) =>
+      item.label.toLowerCase().includes(q) ||
+      item.children?.some((c) => c.label.toLowerCase().includes(q))
+    );
+  }, [navItems, menuSearch]);
 
   const onSignOut = async () => {
-    // Navigate to home FIRST so ProtectedLayout doesn't redirect to /login
-    setAccountMenuOpen(false);
-    setMobileNavOpen(false);
-    beginNavigation();
-    router.replace("/");
-    // Small delay to let navigation start before auth state changes
-    await new Promise((r) => setTimeout(r, 150));
-    start();
-    await signOutCurrentUser();
-    stop();
-    toast.success("Session closed.");
-  };
-
-  const onVerifyUsername = async () => {
-    if (!resetForm.username.trim()) {
-      toast.error("Enter your username.");
-      return;
-    }
-    setSubmitting(true);
     try {
-      const result = await verifyUsername(resetForm.username.trim());
-      if (result.found) {
-        setResetVerifiedName(result.displayName || result.username || resetForm.username.trim());
-        setResetStep("password");
-        toast.success(`Account verified: ${result.displayName || result.username}`);
-      } else {
-        toast.error(result.error || "User not found.");
-      }
+      await signOutCurrentUser();
+      router.replace("/login");
     } catch {
-      toast.error("Unable to verify username.");
-    } finally {
-      setSubmitting(false);
+      toast.error("Failed to sign out.");
     }
   };
 
-  const onResetPassword = async () => {
-    const passLen = resetForm.nextPassword.trim().length;
-    if (passLen < 3 || passLen > 16) {
-      toast.error("Password must be between 3 and 16 characters.");
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetForm.username.trim()) {
+      toast.error("Username is required.");
       return;
     }
-
+    if (resetForm.nextPassword.length < 6) {
+      toast.error("Password must be at least 6 characters.");
+      return;
+    }
     if (resetForm.nextPassword !== resetForm.confirmPassword) {
       toast.error("Passwords do not match.");
       return;
     }
 
     setSubmitting(true);
-
     try {
       await forgotPassword(resetForm.username, resetForm.nextPassword);
       setResetStep("done");
-      toast.success("Your password has been updated successfully!");
-    } catch (error) {
-      toast.error(getFirebaseErrorMessage(error, "Unable to reset password."));
+      toast.success("Password updated successfully!");
+    } catch (err) {
+      toast.error(getFirebaseErrorMessage(err, "Unable to reset password."));
     } finally {
       setSubmitting(false);
     }
   };
 
-  const openForgotModal = () => {
-    setAccountMenuOpen(false);
-    setResetForm({
-      username: profile?.username ?? "",
-      nextPassword: "",
-      confirmPassword: "",
-    });
-    setResetStep("username");
-    setResetVerifiedName("");
-    setForgotModalOpen(true);
-  };
-
-  const closeForgotModal = () => {
-    setForgotModalOpen(false);
-    setResetStep("username");
-    setResetVerifiedName("");
-  };
-
   return (
-    <div className="page-shell min-h-screen">
-      {/* ─── Top Header Bar ────────────────────────────── */}
-      <header className="stk-header sticky top-0 z-30">
-        {/* Primary header */}
-        <div className="mx-auto flex max-w-[1480px] items-center gap-4 px-4 py-2.5">
-          {/* Mobile menu */}
+    <div className="flex min-h-screen flex-col bg-[#f4f6f9] text-[#1e293b]">
+      {/* ─── SMVS Global Top Header Bar ────────────────────────────── */}
+      <header className="sticky top-0 z-30 flex h-14 w-full items-center justify-between border-b border-[#2d3748] bg-[#1e222d] px-3 shadow-md lg:px-4">
+        {/* Left: Brand & Sidebar Toggle */}
+        <div className="flex items-center gap-3">
+          {/* Mobile hamburger */}
           <button
             type="button"
             onClick={() => setMobileNavOpen(true)}
-            className="rounded-lg p-2 text-white hover:bg-white/10 lg:hidden transition"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-white hover:bg-white/10 lg:hidden transition"
           >
             <Menu className="h-5 w-5" />
           </button>
 
-          {/* Logo */}
-          <Link href="/dashboard" className="flex shrink-0 items-center gap-2 no-underline">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--primary)] to-[var(--primary-dark)] text-xs font-extrabold text-white shadow-sm">
-              STK
-            </div>
-            <span className="text-xl font-bold tracking-tight text-white">
-              STK Requirement
-            </span>
-          </Link>
-
-          {/* Spacer */}
-          <div className="flex-1" />
-
-          {/* Account & Role Switcher dropdown with Hover support */}
-          <div className="relative group/user py-1">
-            <button
-              type="button"
-              onClick={() => setAccountMenuOpen(!accountMenuOpen)}
-              className="flex items-center justify-center rounded-full transition hover:scale-105 active:scale-95"
-              title={`${profile?.displayName || "Account"} (${getRoleLabel(optimisticRole ?? workspaceProfile)})`}
-            >
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-xs font-black text-[#09090b] shadow-md ring-2 ring-white/40 hover:ring-[var(--primary)] transition">
-                {(profile?.displayName || profile?.username || "U").trim().charAt(0).toUpperCase()}
-              </div>
-            </button>
-
-            {/* Dropdown menu: Opens on hover OR click */}
-            <div className={cn(
-              "absolute right-0 top-full z-50 w-72 rounded-[var(--radius-xl)] border border-[var(--border)] bg-white/98 backdrop-blur-xl shadow-2xl overflow-hidden transition-all duration-200",
-              "hidden group-hover/user:block",
-              accountMenuOpen && "!block"
-            )}>
-                  {/* Account info */}
-                  <div className="border-b border-[var(--border)] px-4 py-3">
-                    <p className="text-sm font-bold text-[var(--ink)]">
-                      {profile?.displayName}
-                    </p>
-                    <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
-                      @{profile?.username} · {getRoleLabel(optimisticRole ?? workspaceProfile)}
-                    </p>
-                  </div>
-
-                  {/* Role switcher */}
-                  {availableRoles.length > 1 ? (
-                    <div className="border-b border-[var(--border)] px-4 py-3">
-                      <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[var(--ink-soft)]">
-                        Switch Role
-                      </p>
-                      <div className="grid gap-1.5">
-                        {availableRoles.map((role) => {
-                          const selected = role === optimisticRole;
-
-                          return (
-                            <button
-                              key={role}
-                              type="button"
-                              onClick={() => {
-                                // Role switching is instant UI state (no navigation).
-                                // Using beginNavigation() here caused loader to spin forever.
-                                setOptimisticRole(role);
-                                setActiveRole(role);
-                                setAccountMenuOpen(false);
-                                // Ensure Orders experience switches instantly when role changes.
-                                if (role === "USER" && pathname.startsWith("/orders")) {
-                                  beginNavigation();
-                                  router.push("/orders", { scroll: false });
-                                }
-                              }}
-                              className={cn(
-                                "rounded-[var(--radius-sm)] border px-3 py-2 text-left text-sm font-semibold transition",
-                                selected
-                                  ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary-dark)]"
-                                  : "border-[var(--border)] bg-[var(--paper)] text-[var(--ink)] hover:bg-[var(--canvas)]",
-                              )}
-                            >
-                              {getRoleLabel(role)}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {/* Actions */}
-                  <div className="py-1.5">
-                    <button
-                      type="button"
-                      onClick={openForgotModal}
-                      className="flex w-full items-center gap-2.5 px-4 py-2 text-sm text-[var(--ink)] hover:bg-[var(--paper)] transition"
-                    >
-                      <LockKeyhole className="h-4 w-4 text-[var(--ink-soft)]" />
-                      Forgot password
-                    </button>
-                    <hr className="my-1 border-[var(--border)]" />
-                    <button
-                      type="button"
-                      onClick={onSignOut}
-                      className="flex w-full items-center gap-2.5 px-4 py-2 text-sm text-[var(--danger)] hover:bg-[var(--danger-soft)] transition"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      Sign out
-                    </button>
-                  </div>
-                </div>
-          </div>
-        </div>
-
-        {/* ─── Secondary Nav Bar ───────────────────────── */}
-        <nav className="stk-header-sub hidden lg:block">
-          <div className="mx-auto flex max-w-[1480px] items-center gap-1 px-4">
-            {allNavItems.map((item) => {
-              const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-
-              return (
-                <div key={item.href} className="group relative">
-                  <Link
-                    href={item.href}
-                    onClick={() => beginNavigation()}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-t-[var(--radius-sm)] px-3 py-2 text-sm font-semibold no-underline transition",
-                      active
-                        ? "bg-white/10 text-white"
-                        : "text-white/75 hover:text-white",
-                    )}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    {item.label}
-                    {item.children?.length ? (
-                      <ChevronDown className="h-3 w-3" />
-                    ) : null}
-                  </Link>
-
-                  {/* Desktop dropdown for sub-nav */}
-                  {item.children?.length ? (
-                    <div className="invisible absolute left-0 top-full z-40 min-w-[200px] rounded-b-[var(--radius-lg)] border border-[var(--border)] bg-white opacity-0 shadow-[var(--shadow-lg)] group-hover:visible group-hover:opacity-100 transition-all duration-150">
-                      {item.children.map((child) => {
-                        const childActive = pathname === child.href;
-
-                        return (
-                          <Link
-                            key={child.href}
-                            href={child.href}
-                                    onClick={() => beginNavigation()}
-                            className={cn(
-                              "flex items-center gap-2 px-4 py-2.5 text-sm no-underline transition first:rounded-t-[var(--radius-lg)] last:rounded-b-[var(--radius-lg)]",
-                              childActive
-                                ? "bg-[var(--primary-soft)] font-semibold text-[var(--primary-dark)]"
-                                : "text-[var(--ink)] hover:bg-[var(--paper)]",
-                            )}
-                          >
-                            <child.icon className="h-4 w-4 text-[var(--ink-soft)]" />
-                            {child.label}
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-
-                  {/* Active indicator */}
-                  {active ? (
-                    <div className="absolute bottom-0 left-3 right-3 h-[2px] bg-[var(--primary)]" />
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        </nav>
-      </header>
-
-      {/* ─── Page Content ──────────────────────────────── */}
-      <div className="mx-auto max-w-[1480px] px-3 py-4 sm:px-4">
-        {!hidePageHeader ? (
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-xl font-bold text-[var(--ink)] sm:text-2xl">
-                {title}
-              </h1>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--ink-soft)]">
-                {getRoleLabel(optimisticRole ?? workspaceProfile)}
-              </span>
-              <span className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-white px-3 py-1.5 text-xs text-[var(--ink-soft)]">
-                {new Date().toLocaleDateString("en-IN", {
-                  day: "2-digit",
-                  month: "long",
-                  year: "numeric",
-                })}
-              </span>
-            </div>
-          </div>
-        ) : null}
-
-        <div className="space-y-4">{children}</div>
-      </div>
-
-      {/* ─── Mobile Navigation Drawer ──────────────────── */}
-      {mobileNavOpen ? (
-        <div className="fixed inset-0 z-40 lg:hidden">
+          {/* Desktop collapse toggle */}
           <button
             type="button"
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setMobileNavOpen(false)}
-          />
-          <div className="absolute inset-y-0 left-0 w-full max-w-[300px]">
-            <div className="hide-scrollbar flex h-full flex-col overflow-auto bg-white">
-              {/* Mobile header */}
-              <div className="stk-header flex items-center justify-between px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-[var(--primary)] to-[var(--primary-dark)] text-xs font-extrabold text-white">
-                    STK
-                  </div>
-                  <span className="text-base font-bold text-white">STK Requirement</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setMobileNavOpen(false)}
-                  className="rounded p-1 text-white hover:bg-white/10"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="hidden h-9 w-9 items-center justify-center rounded-lg text-white/80 hover:bg-white/10 hover:text-white lg:flex transition"
+            title="Toggle Menu"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
 
-              {/* Mobile account */}
-              <div className="border-b border-[var(--border)] bg-[var(--paper)] px-4 py-3">
-                <p className="text-sm font-bold text-[var(--ink)]">{profile?.displayName}</p>
-                <p className="text-xs text-[var(--ink-soft)]">
-                  @{profile?.username} · {getRoleLabel(workspaceProfile)}
+          {/* Logo & Portal Name */}
+          <Link href="/dashboard" className="flex items-center gap-2.5 no-underline">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-amber-700 text-xs font-black text-white shadow-sm">
+              STK
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-extrabold tracking-tight text-white sm:text-base leading-tight">
+                STK Requirement
+              </span>
+              <span className="text-[10px] font-semibold text-amber-400/90 tracking-wider uppercase">
+                SMVS Global System
+              </span>
+            </div>
+          </Link>
+        </div>
+
+        {/* Center: Active Role Badge */}
+        <div className="hidden items-center gap-2 md:flex">
+          <span className="rounded-full border border-amber-400/30 bg-amber-400/15 px-3 py-1 text-xs font-bold text-amber-300">
+            {getRoleLabel(optimisticRole ?? workspaceProfile)}
+          </span>
+        </div>
+
+        {/* Right: User Avatar Circle with Pure Hover Dropdown */}
+        <div className="flex items-center gap-2">
+          {/* Circular Logo Avatar (Hover opens menu) */}
+          <div className="relative group/user py-1">
+            <div
+              className="flex items-center justify-center rounded-full cursor-pointer transition hover:scale-105"
+              title={`${profile?.displayName || "Account"} (${getRoleLabel(optimisticRole ?? workspaceProfile)})`}
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-xs font-black text-[#0f172a] shadow-md ring-2 ring-white/40 group-hover/user:ring-amber-400 transition">
+                {(profile?.displayName || profile?.username || "U").trim().charAt(0).toUpperCase()}
+              </div>
+            </div>
+
+            {/* Dropdown Menu (Opens cleanly on hover) */}
+            <div className="absolute right-0 top-full z-50 w-72 rounded-2xl border border-gray-200 bg-white p-2 shadow-2xl transition-all duration-200 hidden group-hover/user:block">
+              {/* Account summary */}
+              <div className="border-b border-gray-100 px-3 py-2.5">
+                <p className="text-sm font-bold text-gray-900 leading-tight">
+                  {profile?.displayName}
+                </p>
+                <p className="mt-0.5 text-xs text-gray-500">
+                  @{profile?.username} · <span className="font-semibold text-amber-600">{getRoleLabel(optimisticRole ?? workspaceProfile)}</span>
                 </p>
               </div>
 
-              {/* Mobile nav */}
-              <nav className="flex-1 px-2 py-3">
-                {navSections.map((section) => (
-                  <div key={section.title} className="mb-4">
-                    <p className="mb-2 px-3 text-xs font-bold uppercase tracking-wider text-[var(--ink-soft)]">
-                      {section.title}
-                    </p>
-                    {section.items.map((item) => {
-                      const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-
+              {/* Role switcher */}
+              {availableRoles.length > 1 ? (
+                <div className="border-b border-gray-100 px-3 py-2">
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                    Switch Role
+                  </p>
+                  <div className="grid gap-1">
+                    {availableRoles.map((role) => {
+                      const selected = role === optimisticRole;
                       return (
-                        <div key={item.href}>
-                          <Link
-                            href={item.href}
-                            onClick={() => beginNavigation()}
-                            className={cn(
-                              "flex items-center gap-2.5 rounded-[var(--radius-sm)] px-3 py-2.5 text-sm font-semibold no-underline transition",
-                              active
-                                ? "bg-[var(--primary-soft)] text-[var(--primary-dark)]"
-                                : "text-[var(--ink)] hover:bg-[var(--paper)]",
-                            )}
-                          >
-                            <item.icon className="h-4 w-4" />
-                            {item.label}
-                          </Link>
-
-                          {item.children?.length && active ? (
-                            <div className="ml-6 mt-1 space-y-1 border-l-2 border-[var(--border)] pl-3">
-                              {item.children.map((child) => {
-                                const childActive = pathname === child.href;
-
-                                return (
-                                  <Link
-                                    key={child.href}
-                                    href={child.href}
-                                    onClick={() => beginNavigation()}
-                                    className={cn(
-                                      "flex items-center gap-2 rounded-[var(--radius-sm)] px-3 py-2 text-sm no-underline transition",
-                                      childActive
-                                        ? "font-semibold text-[var(--primary-dark)]"
-                                        : "text-[var(--ink-soft)] hover:text-[var(--ink)]",
-                                    )}
-                                  >
-                                    <child.icon className="h-3.5 w-3.5" />
-                                    {child.label}
-                                  </Link>
-                                );
-                              })}
-                            </div>
-                          ) : null}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-              </nav>
-
-              {/* Mobile footer actions */}
-              <div className="border-t border-[var(--border)] px-3 py-3">
-                {availableRoles.length > 1 ? (
-                  <div className="mb-3">
-                    <p className="mb-1.5 text-xs font-bold uppercase tracking-wider text-[var(--ink-soft)]">
-                      Switch Role
-                    </p>
-                    <div className="grid gap-1.5">
-                      {availableRoles.map((role) => (
                         <button
                           key={role}
                           type="button"
-                          onClick={() => setActiveRole(role)}
+                          onClick={() => {
+                            setOptimisticRole(role);
+                            setActiveRole(role);
+                            if (role === "USER" && pathname.startsWith("/orders")) {
+                              beginNavigation();
+                              router.push("/orders", { scroll: false });
+                            }
+                          }}
                           className={cn(
-                            "rounded-[var(--radius-sm)] border px-3 py-2 text-left text-sm font-semibold transition",
-                            role === activeRole
-                              ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary-dark)]"
-                              : "border-[var(--border)] bg-white text-[var(--ink)] hover:bg-[var(--paper)]",
+                            "rounded-lg px-2.5 py-1.5 text-left text-xs font-bold transition",
+                            selected
+                              ? "bg-amber-500 text-white shadow-sm"
+                              : "bg-gray-50 text-gray-700 hover:bg-gray-100"
                           )}
                         >
                           {getRoleLabel(role)}
                         </button>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
-                ) : null}
+                </div>
+              ) : null}
+
+              {/* Actions */}
+              <div className="py-1">
                 <button
                   type="button"
-                  onClick={() => { setMobileNavOpen(false); openForgotModal(); }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-[var(--ink)] hover:bg-[var(--paper)] transition"
+                  onClick={() => {
+                    setResetForm({
+                      username: profile?.username ?? "",
+                      nextPassword: "",
+                      confirmPassword: "",
+                    });
+                    setResetStep("username");
+                    setForgotModalOpen(true);
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 transition"
                 >
-                  <LockKeyhole className="h-4 w-4 text-[var(--ink-soft)]" />
-                  Forgot password
+                  <LockKeyhole className="h-4 w-4 text-gray-400" />
+                  Forgot Password
                 </button>
                 <button
                   type="button"
                   onClick={onSignOut}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-sm font-semibold text-[var(--danger)]"
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 transition"
                 >
                   <LogOut className="h-4 w-4" />
-                  Sign out
+                  Sign Out
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* ─── Main Portal Layout (Left Sidebar + Content Workspace) ─────────── */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Desktop Left Sidebar (SMVS Global Style) */}
+        <aside
+          className={cn(
+            "hidden flex-col border-r border-[#e2e8f0] bg-white transition-all duration-300 lg:flex",
+            sidebarCollapsed ? "w-16" : "w-64"
+          )}
+        >
+          {/* Menu Search Box (when expanded) */}
+          {!sidebarCollapsed ? (
+            <div className="p-3 border-b border-gray-100">
+              <div className="relative flex items-center">
+                <Search className="absolute left-2.5 h-3.5 w-3.5 text-gray-400" />
+                <input
+                  value={menuSearch}
+                  onChange={(e) => setMenuSearch(e.target.value)}
+                  placeholder="Search..."
+                  className="w-full rounded-lg border border-gray-200 bg-gray-50 py-1.5 pl-8 pr-2.5 text-xs text-gray-900 outline-none transition focus:border-amber-500 focus:bg-white"
+                />
+                {menuSearch ? (
+                  <button
+                    type="button"
+                    onClick={() => setMenuSearch("")}
+                    className="absolute right-2 text-xs text-gray-400 hover:text-gray-600"
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {/* Navigation Items List */}
+          <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+            {filteredNavItems.map((item) => {
+              const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+              const Icon = item.icon;
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => beginNavigation()}
+                  title={sidebarCollapsed ? item.label : undefined}
+                  className={cn(
+                    "flex items-center gap-3 rounded-xl px-2.5 py-2 text-xs font-bold no-underline transition",
+                    active
+                      ? "bg-amber-50 text-amber-900 font-extrabold shadow-sm border border-amber-200"
+                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  )}
+                >
+                  {/* Colored Badge Icon matching SMVS Global */}
+                  <div
+                    className={cn(
+                      "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white shadow-sm",
+                      item.badgeColor || "bg-blue-600"
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </div>
+
+                  {!sidebarCollapsed ? (
+                    <div className="flex flex-1 items-center justify-between">
+                      <span>{item.label}</span>
+                      <ChevronRight className={cn("h-3.5 w-3.5 text-gray-400 transition", active && "text-amber-600 translate-x-0.5")} />
+                    </div>
+                  ) : null}
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Sidebar Footer Info */}
+          {!sidebarCollapsed ? (
+            <div className="border-t border-gray-100 p-3 text-[11px] font-semibold text-gray-400">
+              <span>STK Requirement v2.0</span>
+            </div>
+          ) : null}
+        </aside>
+
+        {/* Main Content Workspace */}
+        <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6">
+          {!hidePageHeader ? (
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h1 className="text-xl font-black text-gray-900 sm:text-2xl tracking-tight">
+                  {title}
+                </h1>
+                <p className="text-xs text-gray-500">
+                  SMVS Global Workspace · {getRoleLabel(optimisticRole ?? workspaceProfile)}
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Page Body */}
+          <div className="space-y-4">{children}</div>
+        </main>
+      </div>
+
+      {/* ─── Mobile Sidebar Drawer ─────────────────────────────────── */}
+      {mobileNavOpen ? (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/60 backdrop-blur-xs"
+            onClick={() => setMobileNavOpen(false)}
+          />
+          <div className="absolute inset-y-0 left-0 w-72 bg-white shadow-2xl flex flex-col">
+            <div className="flex h-14 items-center justify-between border-b border-gray-200 bg-[#1e222d] px-4 text-white">
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded bg-amber-500 text-xs font-black">
+                  STK
+                </div>
+                <span className="font-bold text-sm">STK Requirement</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobileNavOpen(false)}
+                className="text-white/70 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-3 border-b border-gray-100">
+              <input
+                value={menuSearch}
+                onChange={(e) => setMenuSearch(e.target.value)}
+                placeholder="Search..."
+                className="w-full rounded-lg border border-gray-200 bg-gray-50 py-1.5 px-3 text-xs text-gray-900 outline-none"
+              />
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              {filteredNavItems.map((item) => {
+                const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+                const Icon = item.icon;
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => {
+                      beginNavigation();
+                      setMobileNavOpen(false);
+                    }}
+                    className={cn(
+                      "flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-bold no-underline transition",
+                      active
+                        ? "bg-amber-50 text-amber-900 border border-amber-200"
+                        : "text-gray-600 hover:bg-gray-50"
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white shadow-sm",
+                        item.badgeColor || "bg-blue-600"
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <span className="flex-1">{item.label}</span>
+                    <ChevronRight className="h-4 w-4 text-gray-400" />
+                  </Link>
+                );
+              })}
             </div>
           </div>
         </div>
       ) : null}
 
-      {/* ─── Forgot Password Modal (3-step, DB-verified) ── */}
+      {/* Forgot Password Modal */}
       <Modal
         open={forgotModalOpen}
-        onClose={closeForgotModal}
-        title={
-          resetStep === "username"
-            ? "Forgot password"
-            : resetStep === "password"
-              ? "Set new password"
-              : "Password updated"
-        }
-        description={
-          resetStep === "username"
-            ? "Enter your username to verify your account."
-            : resetStep === "password"
-              ? `Account verified: ${resetVerifiedName}`
-              : undefined
-        }
+        onClose={() => setForgotModalOpen(false)}
+        title="Reset Password"
       >
-        <div className="space-y-4">
-          {resetStep === "username" ? (
-            <>
-              <label className="block text-sm font-semibold text-[var(--ink)]">
-                Username
-                <input
-                  value={resetForm.username}
-                  onChange={(event) =>
-                    setResetForm((current) => ({
-                      ...current,
-                      username: event.target.value,
-                    }))
-                  }
-                  className="stk-input mt-1.5 py-2.5"
-                  placeholder="Enter username"
-                  autoFocus
-                />
-              </label>
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={closeForgotModal}
-                  className="btn-secondary"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={onVerifyUsername}
-                  disabled={submitting || !resetForm.username.trim()}
-                  className="btn-action"
-                >
-                  {submitting ? "Checking..." : "Next →"}
-                </button>
-              </div>
-            </>
-          ) : resetStep === "password" ? (
-            <>
-              <div className="rounded-[var(--radius-md)] border border-[var(--success)]/30 bg-[var(--success-soft)] p-3">
-                <p className="text-sm font-semibold text-[var(--success)]">
-                  ✓ Account verified: {resetVerifiedName}
-                </p>
-              </div>
-              <label className="block text-sm font-semibold text-[var(--ink)]">
-                New password
-                <input
-                  type="password"
-                  value={resetForm.nextPassword}
-                  onChange={(event) =>
-                    setResetForm((current) => ({
-                      ...current,
-                      nextPassword: event.target.value,
-                    }))
-                  }
-                  className="stk-input mt-1.5 py-2.5"
-                  placeholder="Min 6 characters"
-                  autoFocus
-                />
-              </label>
-              <label className="block text-sm font-semibold text-[var(--ink)]">
-                Re-enter password
-                <input
-                  type="password"
-                  value={resetForm.confirmPassword}
-                  onChange={(event) =>
-                    setResetForm((current) => ({
-                      ...current,
-                      confirmPassword: event.target.value,
-                    }))
-                  }
-                  className="stk-input mt-1.5 py-2.5"
-                  placeholder="Confirm new password"
-                />
-              </label>
-              <div className="flex justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => setResetStep("username")}
-                  className="btn-secondary"
-                >
-                  ← Back
-                </button>
-                <button
-                  type="button"
-                  onClick={onResetPassword}
-                  disabled={
-                    submitting ||
-                    !resetForm.nextPassword.trim() ||
-                    !resetForm.confirmPassword.trim()
-                  }
-                  className="btn-action"
-                >
-                  {submitting ? "Saving..." : "Change Password"}
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="rounded-[var(--radius-lg)] border border-[var(--success)]/30 bg-[var(--success-soft)] p-6 text-center">
-                <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--success)]/10">
-                  <svg className="h-7 w-7 text-[var(--success)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <h4 className="text-lg font-bold text-[var(--success)]">Password Updated!</h4>
-                <p className="mt-2 text-sm text-[var(--ink-soft)]">
-                  Your password has been updated successfully.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={closeForgotModal}
-                className="btn-action w-full py-2.5"
-              >
-                Done
-              </button>
-            </>
-          )}
-        </div>
+        <form onSubmit={handlePasswordReset} className="space-y-4 p-2">
+          <div>
+            <label className="block text-xs font-bold text-gray-700">Username</label>
+            <input
+              value={resetForm.username}
+              onChange={(e) => setResetForm({ ...resetForm, username: e.target.value })}
+              placeholder="Enter username"
+              className="mt-1 w-full rounded-lg border border-gray-300 p-2 text-xs outline-none focus:border-amber-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-700">New Password (min 6 chars)</label>
+            <input
+              type="password"
+              value={resetForm.nextPassword}
+              onChange={(e) => setResetForm({ ...resetForm, nextPassword: e.target.value })}
+              placeholder="Enter new password"
+              className="mt-1 w-full rounded-lg border border-gray-300 p-2 text-xs outline-none focus:border-amber-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-700">Confirm New Password</label>
+            <input
+              type="password"
+              value={resetForm.confirmPassword}
+              onChange={(e) => setResetForm({ ...resetForm, confirmPassword: e.target.value })}
+              placeholder="Confirm new password"
+              className="mt-1 w-full rounded-lg border border-gray-300 p-2 text-xs outline-none focus:border-amber-500"
+            />
+          </div>
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setForgotModalOpen(false)}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="rounded-lg bg-amber-500 px-4 py-1.5 text-xs font-bold text-white hover:bg-amber-600 disabled:opacity-50"
+            >
+              {submitting ? "Updating..." : "Update Password"}
+            </button>
+          </div>
+        </form>
       </Modal>
     </div>
   );

@@ -630,7 +630,12 @@ export function TeamView() {
                     </tbody>
                   </table>
                 </div>
-                <Pagination currentPage={userPage} totalPages={totalUserPages} onPageChange={setUserPage} />
+                <Pagination
+    currentPage={userPage}
+    totalItems={filteredUsers.length}
+    pageSize={USERS_PER_PAGE}
+    onPageChange={setUserPage}
+  />
               </>
               ) : (
                 <div className="mt-6">

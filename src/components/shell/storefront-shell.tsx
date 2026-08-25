@@ -312,23 +312,17 @@ export function StorefrontShell({
             {isAuthenticated ? (
               /* Account dropdown with hover support */
               <div className="relative group/user py-1">
-                <button
-                  type="button"
-                  onClick={() => setAccountMenuOpen(!accountMenuOpen)}
-                  className="flex items-center justify-center rounded-full transition hover:scale-105 active:scale-95"
+                <div
+                  className="flex items-center justify-center rounded-full cursor-pointer transition hover:scale-105"
                   title={`${profile?.displayName || "Account"} (${getRoleLabel(optimisticRole ?? workspaceProfile)})`}
                 >
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-xs font-black text-[#09090b] shadow-md ring-2 ring-white/40 hover:ring-[var(--primary)] transition">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-xs font-black text-[#09090b] shadow-md ring-2 ring-white/40 group-hover/user:ring-[var(--primary)] transition">
                     {(profile?.displayName || profile?.username || "U").trim().charAt(0).toUpperCase()}
                   </div>
-                </button>
+                </div>
 
-                {/* Dropdown menu: Opens on hover OR click */}
-                <div className={cn(
-                  "absolute right-0 top-full z-50 w-72 rounded-[var(--radius-xl)] border border-[var(--border)] bg-white/98 backdrop-blur-xl shadow-2xl overflow-hidden transition-all duration-200",
-                  "hidden group-hover/user:block",
-                  accountMenuOpen && "!block"
-                )}>
+                {/* Dropdown menu: Opens smoothly ONLY on hover */}
+                <div className="absolute right-0 top-full z-50 w-72 rounded-[var(--radius-xl)] border border-[var(--border)] bg-white/98 backdrop-blur-xl shadow-2xl overflow-hidden transition-all duration-200 hidden group-hover/user:block">
                       {/* Account info */}
                       <div className="border-b border-[var(--border)] px-4 py-3">
                         <p className="text-sm font-bold text-[var(--ink)]">
