@@ -134,17 +134,8 @@ export function StorefrontShell({
     }
   };
 
-  const onSignOut = async () => {
-    setAccountMenuOpen(false);
-    // Navigate to home FIRST so ProtectedLayout doesn't redirect to /login
-    beginNavigation();
-    router.replace("/");
-    // Small delay to let navigation start before auth state changes
-    await new Promise((r) => setTimeout(r, 150));
-    start();
-    await signOutCurrentUser();
-    stop();
-    toast.success("Session closed.");
+  const onSignOut = () => {
+    signOutCurrentUser();
   };
 
   const onVerifyUsername = async () => {

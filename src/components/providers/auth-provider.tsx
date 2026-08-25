@@ -157,8 +157,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       window.sessionStorage.removeItem("stk_tab_session_active");
       window.sessionStorage.setItem(POST_SIGNOUT_REDIRECT_KEY, "1");
     }
-    await logoutAction();
     setProfile(null);
+    void logoutAction().catch(() => {});
+    if (typeof window !== "undefined") {
+      window.location.href = "/";
+    }
   };
 
   const createInitialSuperAdmin = async (input: { username: string; displayName: string; password: string; }) => {

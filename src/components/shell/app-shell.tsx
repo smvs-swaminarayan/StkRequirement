@@ -196,13 +196,8 @@ export function AppShell({
     );
   }, [navItems, menuSearch]);
 
-  const onSignOut = async () => {
-    try {
-      await signOutCurrentUser();
-      router.replace("/login");
-    } catch {
-      toast.error("Failed to sign out.");
-    }
+  const onSignOut = () => {
+    signOutCurrentUser();
   };
 
   const handlePasswordReset = async (e: React.FormEvent) => {
