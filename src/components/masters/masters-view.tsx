@@ -421,7 +421,7 @@ export function MastersView() {
       imageCrop: normalizeItemImageCrop(item.imageCrop),
       images: item.images ?? [],
       is_permission: item.is_permission === "YES" ? "YES" : "NO",
-      active: item.active,
+      active: item.active !== false,
     });
   };
 

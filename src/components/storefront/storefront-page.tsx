@@ -56,13 +56,13 @@ export function StorefrontPage() {
   
   const { items: allUsers, loading: usersLoading } = useFirestoreCollection<AppUserProfile>("users");
   const selectableUsers = useMemo(() => allUsers
-    .filter(u => !u.deletedAt && !(u.roles?.length === 1 && u.roles[0] === "SUPER_ADMIN"))
-    .sort((a,b) => a.username.localeCompare(b.username, undefined, {numeric: true})), [allUsers]);
+    .filter(u => !u.deletedAt && !u.is_deleted && !(u.roles?.length === 1 && (u.roles[0] === "SUPER_ADMIN" || u.roles[0] === "ADMIN")))
+    .sort((a,b) => (a.displayName || a.username || "").localeCompare(b.displayName || b.username || "", undefined, {numeric: true})), [allUsers]);
 
   const userOptions = useMemo(() => {
     const list = selectableUsers.map(u => ({
-      value: String(u.uid),
-      label: `${u.displayName} (${u.username})`
+      value: String(u.uid || u.id),
+      label: `${u.displayName || u.username} (@${u.username})`
     }));
     return [
       { value: "", label: isAuthenticated ? '-- Requesting for Myself --' : '-- Select a User --' },
@@ -335,13 +335,16 @@ export function StorefrontPage() {
                   {/* Overlay Gradient on hover */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
                   
-                  <div className="absolute left-3 top-3 flex items-center gap-1">
+                  <div className="absolute left-3 top-3 flex items-center gap-1.5">
                     <div className="rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-[var(--ink)] shadow-md backdrop-blur-md">
                       {item.categoryName}
                     </div>
                     {item.is_permission === "YES" || String(item.is_permission).toUpperCase() === "YES" ? (
-                      <div className="rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-black text-white shadow-md border border-red-700 tracking-wider">
-                        P. SANTO PERMISSION
+                      <div 
+                        className="flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white shadow-md ring-2 ring-white transition hover:scale-110 cursor-help"
+                        title="P. Santo ni Permission Farjiyat"
+                      >
+                        <span className="text-[11px] font-black leading-none">★</span>
                       </div>
                     ) : null}
                   </div>
@@ -377,14 +380,19 @@ export function StorefrontPage() {
                 </div>
                 <div className="flex flex-1 flex-col justify-between p-4 bg-[var(--surface)]">
                   <div>
-                    <h4 className="text-sm font-extrabold leading-tight text-[var(--ink)] group-hover:text-[var(--primary-dark)] transition-colors">
-                      {item.name}
-                    </h4>
-                    {item.is_permission === "YES" || String(item.is_permission).toUpperCase() === "YES" ? (
-                      <div className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-red-600 text-white px-2 py-0.5 text-[11px] font-bold shadow-sm">
-                        <span>🔒 P. Santo ni Permission Farjiyat</span>
-                      </div>
-                    ) : null}
+                    <div className="flex items-start justify-between gap-1.5">
+                      <h4 className="text-sm font-extrabold leading-tight text-[var(--ink)] group-hover:text-[var(--primary-dark)] transition-colors">
+                        {item.name}
+                      </h4>
+                      {item.is_permission === "YES" || String(item.is_permission).toUpperCase() === "YES" ? (
+                        <span 
+                          className="inline-flex shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600 px-1.5 py-0.5 text-[10px] font-bold" 
+                          title="P. Santo ni Permission Farjiyat"
+                        >
+                          ★ Perm
+                        </span>
+                      ) : null}
+                    </div>
                     {item.productId ? (
                       <p className="mt-1 text-[10px] font-bold tracking-widest text-[var(--ink-light)] uppercase">
                         ID: {item.productId}
@@ -406,7 +414,7 @@ export function StorefrontPage() {
                       ) : null}
                     </div>
                   </div>
-                  <div className="mt-4 grid grid-cols-2 gap-2 opacity-90 transition-opacity group-hover:opacity-100">
+                  <div className="mt-4 grid grid-cols-2 gap-2.5">
                     <button
                       type="button"
                       onClick={(e) => {
@@ -424,7 +432,12 @@ export function StorefrontPage() {
                           setDetailActiveImage(0);
                         }
                       }}
-                      className={cn("btn-action w-full py-2 text-xs", isOutOfStock && "bg-[var(--danger)] text-white border-[var(--danger)] hover:bg-[var(--danger-dark)] hover:border-[var(--danger-dark)]")}
+                      className={cn(
+                        "flex h-10 w-full items-center justify-center rounded-[var(--radius-md)] px-3 text-xs font-bold transition-all shadow-sm active:scale-[0.98]",
+                        isOutOfStock 
+                          ? "bg-[var(--danger)] text-white hover:bg-[var(--danger-dark)]" 
+                          : "bg-[var(--primary)] text-white hover:bg-[var(--primary-dark)]"
+                      )}
                     >
                       {isOutOfStock ? "Request Item" : "Buy Item"}
                     </button>
@@ -436,8 +449,8 @@ export function StorefrontPage() {
                         addToCart(item.id);
                       }}
                       className={cn(
-                        "btn-secondary w-full py-2 text-xs",
-                        (isOutOfStock || remainingToAdd <= 0) && "opacity-50 cursor-not-allowed",
+                        "flex h-10 w-full items-center justify-center rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 text-xs font-bold text-[var(--ink)] transition-all shadow-sm hover:border-[var(--primary)] hover:bg-[var(--paper)] active:scale-[0.98]",
+                        (isOutOfStock || remainingToAdd <= 0) && "opacity-50 cursor-not-allowed hover:border-[var(--border)] hover:bg-white",
                       )}
                     >
                       {remainingToAdd <= 0 && !isOutOfStock ? "Cart limit" : "Add to cart"}

@@ -50,6 +50,10 @@ function parseRow(row: any) {
     parsed.is_deleted = parsed.is_deleted === 1;
     parsed.active = !parsed.is_deleted;
   }
+
+  if (parsed.uid && !parsed.id) {
+    parsed.id = parsed.uid;
+  }
   
   return parsed;
 }

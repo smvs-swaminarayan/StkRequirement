@@ -75,6 +75,13 @@ function parseRow(row: any) {
   if (!row) return row;
   const parsed = { ...row };
   
+  if (parsed.is_deleted !== undefined) {
+    parsed.active = parsed.is_deleted === 0;
+    if (parsed.is_deleted === 0) {
+      parsed.deletedAt = null;
+    }
+  }
+
   for (const field of jsonFields) {
     if (parsed[field] !== undefined && typeof parsed[field] === "string") {
       try {
@@ -89,6 +96,10 @@ function parseRow(row: any) {
     if (parsed[field] !== undefined) {
       parsed[field] = parsed[field] === 1;
     }
+  }
+
+  if (parsed.uid && !parsed.id) {
+    parsed.id = parsed.uid;
   }
 
   return parsed;

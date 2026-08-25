@@ -536,6 +536,7 @@ export async function updateItem(
 ) {
   const numericId = parseInt(String(id), 10) || id;
   const numericCatId = parseInt(String(values.categoryId), 10) || values.categoryId;
+  const isActive = values.active !== false;
 
   await updateDoc(doc(db, "items", numericId), {
     name: values.name.trim(),
@@ -548,19 +549,19 @@ export async function updateItem(
     imageCrop: values.imageCrop ?? null,
     images: values.images ?? [],
     is_permission: values.is_permission === "YES" ? "YES" : "NO",
-    active: values.active,
-    deletedAt: values.active ? null : serverTimestamp(),
-    deletedById: values.active ? null : actor?.actorId ?? null,
-    deletedByName: values.active ? null : actor?.actorName ?? null,
+    active: isActive,
+    deletedAt: isActive ? null : serverTimestamp(),
+    deletedById: isActive ? null : actor?.actorId ?? null,
+    deletedByName: isActive ? null : actor?.actorName ?? null,
     updatedAt: serverTimestamp(),
   });
 
   await createAuditLog(
     {
-      action: values.active ? "ITEM_UPDATED" : "ITEM_DEACTIVATED",
+      action: isActive ? "ITEM_UPDATED" : "ITEM_DEACTIVATED",
       targetType: "item",
       targetId: String(id),
-      message: values.active
+      message: isActive
         ? `Updated item ${values.name.trim()}.`
         : `Deactivated item ${values.name.trim()}.`,
     },

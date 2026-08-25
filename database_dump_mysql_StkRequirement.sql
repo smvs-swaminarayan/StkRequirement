@@ -1,5 +1,5 @@
 -- STK Stock Management MySQL / phpMyAdmin Database Dump
--- Exported at: 2026-08-08T09:22:59.732Z
+-- Exported at: 2026-08-24T13:13:10.720Z
 -- Table Prefix: "StkRequirement_"
 
 SET FOREIGN_KEY_CHECKS = 0;

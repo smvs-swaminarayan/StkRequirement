@@ -86,15 +86,7 @@ function buildNavSections(activeRole: Role | null) {
       title: "Workspace",
       items: [
         { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-        {
-          href: "/orders/cart",
-          label: "My Orders",
-          icon: ClipboardList,
-          children: [
-            { href: "/orders/cart", label: "My Cart", icon: ShoppingCart },
-            { href: "/orders/history", label: "Order History", icon: History },
-          ],
-        },
+        { href: "/orders/history", label: "My Orders", icon: History },
       ],
     },
     {
@@ -254,7 +246,7 @@ export function AppShell({
               STK
             </div>
             <span className="text-xl font-bold tracking-tight text-white">
-              StkRequirement
+              STK Requirement
             </span>
           </Link>
 
@@ -268,39 +260,30 @@ export function AppShell({
             </span>
           </div>
 
-          {/* Date */}
-          <div className="hidden text-xs text-white/60 lg:block">
-            {new Date().toLocaleDateString("en-IN", {
-              day: "2-digit",
-              month: "short",
-              year: "numeric",
-            })}
-          </div>
-
-          {/* Account & Role Switcher dropdown */}
-          <div className="relative">
+          {/* Account & Role Switcher dropdown with Hover support */}
+          <div className="relative group/user py-1">
             <button
               type="button"
               onClick={() => setAccountMenuOpen(!accountMenuOpen)}
-              className="flex items-center gap-2 rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-sm text-white transition hover:bg-white/20"
+              className="flex items-center gap-2 rounded-full border border-white/20 bg-white/10 p-1 pr-3 text-sm text-white transition hover:bg-white/20 hover:border-white/40"
             >
-              <User className="h-4 w-4 text-amber-400" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-xs font-black text-[#09090b] shadow-md ring-2 ring-white/30">
+                {(profile?.displayName || profile?.username || "U").trim().charAt(0).toUpperCase()}
+              </div>
               <span className="hidden font-semibold max-w-[120px] truncate sm:block">
                 {profile?.displayName ?? "Account"}
               </span>
-              <span className="rounded bg-amber-400/20 px-2 py-0.5 text-xs font-bold text-amber-300 border border-amber-400/40">
+              <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-[11px] font-bold text-amber-300 border border-amber-400/40">
                 {getRoleLabel(optimisticRole ?? workspaceProfile)} ▾
               </span>
             </button>
 
-            {accountMenuOpen ? (
-              <>
-                <button
-                  type="button"
-                  className="fixed inset-0 z-40 cursor-default"
-                  onClick={() => setAccountMenuOpen(false)}
-                />
-                <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-72 animate-slide-down rounded-[var(--radius-lg)] border border-[var(--border)] bg-white shadow-[var(--shadow-xl)]">
+            {/* Dropdown menu: Opens on hover OR click */}
+            <div className={cn(
+              "absolute right-0 top-full z-50 w-72 rounded-[var(--radius-xl)] border border-[var(--border)] bg-white/98 backdrop-blur-xl shadow-2xl overflow-hidden transition-all duration-200",
+              "hidden group-hover/user:block",
+              accountMenuOpen && "!block"
+            )}>
                   {/* Account info */}
                   <div className="border-b border-[var(--border)] px-4 py-3">
                     <p className="text-sm font-bold text-[var(--ink)]">

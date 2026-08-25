@@ -228,7 +228,7 @@ export function StorefrontShell({
                 STK
               </div>
               <span className="hidden text-lg font-bold tracking-tight text-white sm:block">
-                StkRequirement
+                STK Requirement
               </span>
             </Link>
           </div>
@@ -310,28 +310,28 @@ export function StorefrontShell({
 
             {/* Auth section */}
             {isAuthenticated ? (
-              /* Account dropdown */
-              <div className="relative">
+              /* Account dropdown with hover support */
+              <div className="relative group/user py-1">
                 <button
                   type="button"
                   onClick={() => setAccountMenuOpen(!accountMenuOpen)}
-                  className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-2.5 py-1.5 text-sm text-white transition hover:border-white/30 hover:bg-white/10"
+                  className="flex items-center gap-2 rounded-full border border-white/20 bg-white/10 p-1 pr-2.5 text-sm text-white transition hover:bg-white/20 hover:border-white/40"
                 >
-                  <User className="h-4 w-4" />
-                  <span className="hidden max-w-[120px] truncate font-medium sm:block">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-xs font-black text-[#09090b] shadow-md ring-2 ring-white/30">
+                    {(profile?.displayName || profile?.username || "U").trim().charAt(0).toUpperCase()}
+                  </div>
+                  <span className="hidden max-w-[120px] truncate font-bold text-xs sm:block">
                     {profile?.displayName ?? "Account"}
                   </span>
-                  <ChevronDown className={cn("h-3.5 w-3.5 transition duration-300", accountMenuOpen && "rotate-180")} />
+                  <ChevronDown className="h-3.5 w-3.5 transition duration-300 group-hover/user:rotate-180" />
                 </button>
 
-                {accountMenuOpen ? (
-                  <>
-                    <button
-                      type="button"
-                      className="fixed inset-0 z-40 cursor-default"
-                      onClick={() => setAccountMenuOpen(false)}
-                    />
-                    <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-72 animate-slide-down rounded-[var(--radius-xl)] border border-[var(--border)] bg-white/95 backdrop-blur-xl shadow-[var(--shadow-xl)] overflow-hidden">
+                {/* Dropdown menu: Opens on hover OR click */}
+                <div className={cn(
+                  "absolute right-0 top-full z-50 w-72 rounded-[var(--radius-xl)] border border-[var(--border)] bg-white/98 backdrop-blur-xl shadow-2xl overflow-hidden transition-all duration-200",
+                  "hidden group-hover/user:block",
+                  accountMenuOpen && "!block"
+                )}>
                       {/* Account info */}
                       <div className="border-b border-[var(--border)] px-4 py-3">
                         <p className="text-sm font-bold text-[var(--ink)]">

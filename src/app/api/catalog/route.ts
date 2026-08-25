@@ -14,8 +14,9 @@ export async function GET() {
       .filter((c: any) => c.active !== false && !c.deletedAt && !c.is_deleted)
       .sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
 
+    const activeCategoryIds = new Set(categories.map((c: any) => String(c.id)));
     const items = (itemsResult as any[])
-      .filter((i: any) => i.active !== false && !i.deletedAt && !i.is_deleted)
+      .filter((i: any) => i.active !== false && !i.deletedAt && !i.is_deleted && activeCategoryIds.has(String(i.categoryId)))
       .sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
 
     const catalogData = {
@@ -26,7 +27,7 @@ export async function GET() {
 
     return NextResponse.json(catalogData, {
       headers: {
-        'Cache-Control': 'no-store, max-age=0, must-revalidate'
+        'Cache-Control': 'public, s-maxage=5, stale-while-revalidate=15'
       }
     });
   } catch (error: any) {

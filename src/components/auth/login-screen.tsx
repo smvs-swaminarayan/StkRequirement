@@ -23,7 +23,7 @@ function resolveNextAfterLogin(nextPath?: string) {
     return { target: "/orders/cart", forceUserRole: true };
   }
 
-  const target = (normalized && normalized !== "/") ? normalized : "/orders";
+  const target = (normalized && normalized !== "/") ? normalized : "/dashboard";
   return { target, forceUserRole: false };
 }
 

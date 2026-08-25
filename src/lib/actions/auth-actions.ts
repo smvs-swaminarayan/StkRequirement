@@ -15,15 +15,15 @@ export async function loginAction(username: string, passwordString: string) {
   
   const user = users && users[0];
   if (!user) {
-    throw new Error("This account is not configured.");
+    throw new Error("Username does not exist.");
   }
   
   if (user.is_deleted === 1 || user.deletedAt) {
-    throw new Error("This account is inactive.");
+    throw new Error("This account is deactivated.");
   }
   
   if (user.password !== passwordString) {
-    throw new Error("Invalid password.");
+    throw new Error("Password is wrong.");
   }
   
   const cookieStore = await cookies();

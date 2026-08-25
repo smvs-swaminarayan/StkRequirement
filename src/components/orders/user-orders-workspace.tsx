@@ -617,22 +617,13 @@ export function UserOrdersWorkspace({ activeView }: { activeView: UserOrdersView
                   Track your orders
                 </h3>
               </div>
-              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px]">
-                <label className="relative block">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ink-soft)]" />
-                  <input
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search orders..."
-                    className="stk-input pl-9"
-                  />
-                </label>
+              <div className="flex items-center gap-2">
                 <select
                   value={historyStatus}
                   onChange={(event) =>
                     setHistoryStatus(event.target.value as (typeof historyStatuses)[number])
                   }
-                  className="stk-select"
+                  className="stk-select sm:w-[180px]"
                 >
                   {historyStatuses.map((status) => (
                     <option key={status} value={status}>
@@ -674,9 +665,16 @@ export function UserOrdersWorkspace({ activeView }: { activeView: UserOrdersView
                       <div className="space-y-3">
                         <div className="flex flex-wrap items-start justify-between gap-2">
                           <div>
-                            <p className="text-xs font-bold uppercase tracking-wider text-[var(--primary-dark)]">
-                              {order.categoryName}
-                            </p>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="text-xs font-bold uppercase tracking-wider text-[var(--primary-dark)]">
+                                {order.categoryName}
+                              </p>
+                              {orderItem?.productId ? (
+                                <span className="rounded bg-[var(--paper)] border border-[var(--border)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--ink-light)]">
+                                  ID: {orderItem.productId}
+                                </span>
+                              ) : null}
+                            </div>
                             <h4 className="mt-1 text-lg font-bold text-[var(--ink)]">
                               {order.itemName}
                             </h4>
@@ -904,9 +902,16 @@ export function UserOrdersWorkspace({ activeView }: { activeView: UserOrdersView
                       </div>
                       <div className="space-y-2">
                         <div>
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--primary-dark)]">
-                            {line.category.name}
-                          </p>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--primary-dark)]">
+                              {line.category.name}
+                            </p>
+                            {line.item.productId ? (
+                              <span className="rounded bg-[var(--canvas-strong)] border border-[var(--border)] px-1.5 py-0.2 text-[9px] font-extrabold text-[var(--ink-soft)]">
+                                ID: {line.item.productId}
+                              </span>
+                            ) : null}
+                          </div>
                           <h4 className="mt-0.5 text-sm font-bold text-[var(--ink)]">{line.item.name}</h4>
                           <p className="text-xs text-[var(--ink-soft)]">Unit: {line.item.unit}</p>
                           {(() => {

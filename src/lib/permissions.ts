@@ -58,7 +58,7 @@ export function getRoleLabel(subject: PermissionSubject) {
     return "--";
   }
 
-  if (role === "SUPER_ADMIN" || role === "ADMIN") return "STK Department";
+  if (role === "SUPER_ADMIN" || role === "ADMIN") return "Super Admin";
   if (role === "LEADER" || role === "PROXY") return "Leader";
   if (role === "USER") return "User";
 

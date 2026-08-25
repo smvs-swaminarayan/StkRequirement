@@ -183,9 +183,16 @@ export function ManagerOrdersWorkspace() {
                             )}
                           </div>
                           <div className="min-w-0">
-                            <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--ink-soft)] truncate">
-                              {order.categoryName}
-                            </p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--ink-soft)] truncate">
+                                {order.categoryName}
+                              </p>
+                              {orderItem?.productId ? (
+                                <span className="rounded bg-[var(--paper)] border border-[var(--border)] px-1.5 py-0.2 text-[9px] font-bold text-[var(--ink-light)]">
+                                  ID: {orderItem.productId}
+                                </span>
+                              ) : null}
+                            </div>
                             <h4 className="text-sm font-bold text-[var(--ink)] truncate group-hover:text-[var(--primary)] transition-colors">
                               {order.itemName}
                             </h4>
