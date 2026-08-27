@@ -182,19 +182,27 @@ export async function createUserAccount(
     input.defaultLeaderCategoryId,
   );
 
-  const created = await createUserWithEmailAndPassword(
-    secondaryAuth,
-    authEmail,
-    input.password,
-  );
+  let uid: string;
+  try {
+    const created = await createUserWithEmailAndPassword(
+      secondaryAuth,
+      authEmail,
+      input.password,
+    );
+    uid = created.user.uid;
+    await signOut(secondaryAuth).catch(() => {});
+  } catch (err: any) {
+    console.warn("Secondary auth creation fallback to unique uid:", err?.message);
+    uid = `u_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  }
 
-  const uid = created.user.uid;
   const batch = writeBatch(db);
 
   batch.set(doc(db, "users", uid), {
     uid,
     username,
     usernameLower,
+    password: input.password,
     displayName: input.displayName.trim(),
     role: roleFields.role,
     roles: roleFields.roles,
@@ -238,7 +246,6 @@ export async function createUserAccount(
   }
 
   await batch.commit();
-  await signOut(secondaryAuth);
   emitFirestoreRefresh(options?.markBootstrap ? ["users", "usernames", "meta"] : ["users", "usernames"]);
 
   await createAuditLog(

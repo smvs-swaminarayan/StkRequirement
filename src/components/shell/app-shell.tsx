@@ -19,12 +19,12 @@ import {
   ShoppingCart,
   Users,
   X,
-  ChevronLeft,
-  Settings,
-  HelpCircle,
-  FolderTree,
-  FileSpreadsheet,
   Package,
+  Tags,
+  BarChart3,
+  FileSpreadsheet,
+  TrendingUp,
+  UserCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
@@ -35,16 +35,18 @@ import { getRoleLabel } from "@/lib/permissions";
 import type { Role } from "@/lib/firebase/types";
 import { cn } from "@/lib/utils";
 
+type NavSubItem = {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+};
+
 type NavItem = {
   href: string;
   label: string;
   badgeColor?: string;
   icon: React.ComponentType<{ className?: string }>;
-  children?: Array<{
-    href: string;
-    label: string;
-    icon: React.ComponentType<{ className?: string }>;
-  }>;
+  children?: NavSubItem[];
 };
 
 function buildNavSections(activeRole: Role | null): NavItem[] {
@@ -67,6 +69,11 @@ function buildNavSections(activeRole: Role | null): NavItem[] {
         label: "Masters & Stock",
         badgeColor: "bg-emerald-600",
         icon: Boxes,
+        children: [
+          { href: "/masters", label: "Items Master", icon: Package },
+          { href: "/masters", label: "Categories Master", icon: Tags },
+          { href: "/masters", label: "Stock Entries", icon: BarChart3 },
+        ],
       },
       {
         href: "/requests",
@@ -85,6 +92,12 @@ function buildNavSections(activeRole: Role | null): NavItem[] {
         label: "Reports Admin",
         badgeColor: "bg-purple-600",
         icon: Shield,
+        children: [
+          { href: "/reports", label: "Order Report", icon: FileSpreadsheet },
+          { href: "/reports", label: "Stock Master Report", icon: BarChart3 },
+          { href: "/reports", label: "Item Usage Report", icon: TrendingUp },
+          { href: "/reports", label: "Memberwise Report", icon: UserCheck },
+        ],
       },
     ];
   }
@@ -108,6 +121,10 @@ function buildNavSections(activeRole: Role | null): NavItem[] {
         label: "Items & Stock",
         badgeColor: "bg-emerald-600",
         icon: Boxes,
+        children: [
+          { href: "/masters", label: "Items Master", icon: Package },
+          { href: "/masters", label: "Stock Entries", icon: BarChart3 },
+        ],
       },
       {
         href: "/requests",
@@ -120,6 +137,11 @@ function buildNavSections(activeRole: Role | null): NavItem[] {
         label: "Reports Leader",
         badgeColor: "bg-purple-600",
         icon: Shield,
+        children: [
+          { href: "/reports", label: "Assigned Order Report", icon: FileSpreadsheet },
+          { href: "/reports", label: "Assigned Stock Report", icon: BarChart3 },
+          { href: "/reports", label: "Item Usage Report", icon: TrendingUp },
+        ],
       },
     ];
   }
@@ -142,6 +164,10 @@ function buildNavSections(activeRole: Role | null): NavItem[] {
       label: "My Reports",
       badgeColor: "bg-purple-600",
       icon: Shield,
+      children: [
+        { href: "/reports", label: "My Order Report", icon: FileSpreadsheet },
+        { href: "/reports", label: "My Requested Items", icon: TrendingUp },
+      ],
     },
   ];
 }
@@ -170,6 +196,10 @@ export function AppShell({
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [menuSearch, setMenuSearch] = useState("");
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    "/masters": true,
+    "/reports": true,
+  });
   const [optimisticRole, setOptimisticRole] = useState<Role | null>(activeRole);
   const [forgotModalOpen, setForgotModalOpen] = useState(false);
   const [resetStep, setResetStep] = useState<"username" | "password" | "done">("username");
@@ -178,7 +208,6 @@ export function AppShell({
     nextPassword: "",
     confirmPassword: "",
   });
-  const [resetVerifiedName, setResetVerifiedName] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -190,11 +219,22 @@ export function AppShell({
   const filteredNavItems = useMemo(() => {
     if (!menuSearch.trim()) return navItems;
     const q = menuSearch.toLowerCase().trim();
-    return navItems.filter((item) =>
-      item.label.toLowerCase().includes(q) ||
-      item.children?.some((c) => c.label.toLowerCase().includes(q))
+    return navItems.filter(
+      (item) =>
+        item.label.toLowerCase().includes(q) ||
+        item.children?.some((c) => c.label.toLowerCase().includes(q)),
     );
   }, [navItems, menuSearch]);
+
+  const toggleSection = (href: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    setExpandedSections((prev) => ({
+      ...prev,
+      [href]: !prev[href],
+    }));
+  };
 
   const onSignOut = () => {
     signOutCurrentUser();
@@ -229,7 +269,7 @@ export function AppShell({
 
   return (
     <div className="flex min-h-screen flex-col bg-[#f4f6f9] text-[#1e293b]">
-      {/* ─── SMVS Global Top Header Bar ────────────────────────────── */}
+      {/* ─── Top Header Bar ────────────────────────────── */}
       <header className="sticky top-0 z-30 flex h-14 w-full items-center justify-between border-b border-[#2d3748] bg-[#1e222d] px-3 shadow-md lg:px-4">
         {/* Left: Brand & Sidebar Toggle */}
         <div className="flex items-center gap-3">
@@ -252,19 +292,14 @@ export function AppShell({
             <Menu className="h-5 w-5" />
           </button>
 
-          {/* Logo & Portal Name */}
+          {/* Logo & Clean Portal Title (Without SMVS Global System text) */}
           <Link href="/dashboard" className="flex items-center gap-2.5 no-underline">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-amber-700 text-xs font-black text-white shadow-sm">
               STK
             </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-extrabold tracking-tight text-white sm:text-base leading-tight">
-                STK Requirement
-              </span>
-              <span className="text-[10px] font-semibold text-amber-400/90 tracking-wider uppercase">
-                SMVS Global System
-              </span>
-            </div>
+            <span className="text-base font-extrabold tracking-tight text-white leading-tight">
+              STK Requirement
+            </span>
           </Link>
         </div>
 
@@ -277,7 +312,6 @@ export function AppShell({
 
         {/* Right: User Avatar Circle with Pure Hover Dropdown */}
         <div className="flex items-center gap-2">
-          {/* Circular Logo Avatar (Hover opens menu) */}
           <div className="relative group/user py-1">
             <div
               className="flex items-center justify-center rounded-full cursor-pointer transition hover:scale-105"
@@ -288,7 +322,7 @@ export function AppShell({
               </div>
             </div>
 
-            {/* Dropdown Menu (Opens cleanly on hover) */}
+            {/* Dropdown Menu */}
             <div className="absolute right-0 top-full z-50 w-72 rounded-2xl border border-gray-200 bg-white p-2 shadow-2xl transition-all duration-200 hidden group-hover/user:block">
               {/* Account summary */}
               <div className="border-b border-gray-100 px-3 py-2.5">
@@ -325,7 +359,7 @@ export function AppShell({
                             "rounded-lg px-2.5 py-1.5 text-left text-xs font-bold transition",
                             selected
                               ? "bg-amber-500 text-white shadow-sm"
-                              : "bg-gray-50 text-gray-700 hover:bg-gray-100"
+                              : "bg-gray-50 text-gray-700 hover:bg-gray-100",
                           )}
                         >
                           {getRoleLabel(role)}
@@ -370,11 +404,11 @@ export function AppShell({
 
       {/* ─── Main Portal Layout (Left Sidebar + Content Workspace) ─────────── */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Desktop Left Sidebar (SMVS Global Style) */}
+        {/* Desktop Left Sidebar (Hierarchy Accordion Style) */}
         <aside
           className={cn(
             "hidden flex-col border-r border-[#e2e8f0] bg-white transition-all duration-300 lg:flex",
-            sidebarCollapsed ? "w-16" : "w-64"
+            sidebarCollapsed ? "w-16" : "w-64",
           )}
         >
           {/* Menu Search Box (when expanded) */}
@@ -385,7 +419,7 @@ export function AppShell({
                 <input
                   value={menuSearch}
                   onChange={(e) => setMenuSearch(e.target.value)}
-                  placeholder="Search..."
+                  placeholder="Search menu..."
                   className="w-full rounded-lg border border-gray-200 bg-gray-50 py-1.5 pl-8 pr-2.5 text-xs text-gray-900 outline-none transition focus:border-amber-500 focus:bg-white"
                 />
                 {menuSearch ? (
@@ -401,42 +435,93 @@ export function AppShell({
             </div>
           ) : null}
 
-          {/* Navigation Items List */}
-          <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+          {/* Navigation Items List with Nested Hierarchy Submenus */}
+          <div className="flex-1 overflow-y-auto p-2 space-y-1">
             {filteredNavItems.map((item) => {
+              const hasChildren = Boolean(item.children?.length);
+              const isExpanded = Boolean(expandedSections[item.href] || menuSearch.trim());
               const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
               const Icon = item.icon;
 
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => beginNavigation()}
-                  title={sidebarCollapsed ? item.label : undefined}
-                  className={cn(
-                    "flex items-center gap-3 rounded-xl px-2.5 py-2 text-xs font-bold no-underline transition",
-                    active
-                      ? "bg-amber-50 text-amber-900 font-extrabold shadow-sm border border-amber-200"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  )}
-                >
-                  {/* Colored Badge Icon matching SMVS Global */}
+                <div key={item.href} className="space-y-0.5">
+                  {/* Parent Item */}
                   <div
+                    onClick={() => {
+                      if (hasChildren && !sidebarCollapsed) {
+                        toggleSection(item.href);
+                      }
+                    }}
                     className={cn(
-                      "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white shadow-sm",
-                      item.badgeColor || "bg-blue-600"
+                      "flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-bold transition cursor-pointer select-none",
+                      active
+                        ? "bg-amber-50/80 text-amber-900 font-extrabold shadow-2xs border border-amber-200/80"
+                        : "text-gray-700 hover:bg-gray-50 hover:text-gray-900",
                     )}
                   >
-                    <Icon className="h-4 w-4" />
+                    <Link
+                      href={item.href}
+                      onClick={() => beginNavigation()}
+                      title={sidebarCollapsed ? item.label : undefined}
+                      className="flex flex-1 items-center gap-2.5 no-underline text-inherit"
+                    >
+                      {/* Color-Coded Icon Badge */}
+                      <div
+                        className={cn(
+                          "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white shadow-2xs",
+                          item.badgeColor || "bg-blue-600",
+                        )}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </div>
+
+                      {!sidebarCollapsed ? (
+                        <span className="flex-1 truncate">{item.label}</span>
+                      ) : null}
+                    </Link>
+
+                    {/* Expand/Collapse Chevron for parents with children */}
+                    {hasChildren && !sidebarCollapsed ? (
+                      <button
+                        type="button"
+                        onClick={(e) => toggleSection(item.href, e)}
+                        className="rounded p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-200/60 transition"
+                      >
+                        <ChevronDown
+                          className={cn(
+                            "h-3.5 w-3.5 transition-transform duration-200",
+                            isExpanded ? "rotate-0 text-amber-600" : "-rotate-90 text-gray-400",
+                          )}
+                        />
+                      </button>
+                    ) : null}
                   </div>
 
-                  {!sidebarCollapsed ? (
-                    <div className="flex flex-1 items-center justify-between">
-                      <span>{item.label}</span>
-                      <ChevronRight className={cn("h-3.5 w-3.5 text-gray-400 transition", active && "text-amber-600 translate-x-0.5")} />
+                  {/* Hierarchical Submenu Items (Hierarchy List) */}
+                  {hasChildren && isExpanded && !sidebarCollapsed ? (
+                    <div className="ml-5 pl-3 border-l-2 border-amber-200/70 space-y-0.5 py-0.5">
+                      {item.children!.map((child) => {
+                        const ChildIcon = child.icon;
+                        return (
+                          <Link
+                            key={child.label}
+                            href={child.href}
+                            onClick={() => beginNavigation()}
+                            className={cn(
+                              "flex items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] font-semibold no-underline transition",
+                              active
+                                ? "text-amber-900 hover:bg-amber-100/50"
+                                : "text-gray-500 hover:text-gray-900 hover:bg-gray-100/70",
+                            )}
+                          >
+                            <ChildIcon className="h-3.5 w-3.5 text-gray-400" />
+                            <span className="truncate">{child.label}</span>
+                          </Link>
+                        );
+                      })}
                     </div>
                   ) : null}
-                </Link>
+                </div>
               );
             })}
           </div>
@@ -458,7 +543,7 @@ export function AppShell({
                   {title}
                 </h1>
                 <p className="text-xs text-gray-500">
-                  SMVS Global Workspace · {getRoleLabel(optimisticRole ?? workspaceProfile)}
+                  Workspace · {getRoleLabel(optimisticRole ?? workspaceProfile)}
                 </p>
               </div>
             </div>
@@ -498,42 +583,83 @@ export function AppShell({
               <input
                 value={menuSearch}
                 onChange={(e) => setMenuSearch(e.target.value)}
-                placeholder="Search..."
+                placeholder="Search menu..."
                 className="w-full rounded-lg border border-gray-200 bg-gray-50 py-1.5 px-3 text-xs text-gray-900 outline-none"
               />
             </div>
 
             <div className="flex-1 overflow-y-auto p-2 space-y-1">
               {filteredNavItems.map((item) => {
+                const hasChildren = Boolean(item.children?.length);
+                const isExpanded = Boolean(expandedSections[item.href] || menuSearch.trim());
                 const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
                 const Icon = item.icon;
 
                 return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => {
-                      beginNavigation();
-                      setMobileNavOpen(false);
-                    }}
-                    className={cn(
-                      "flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-bold no-underline transition",
-                      active
-                        ? "bg-amber-50 text-amber-900 border border-amber-200"
-                        : "text-gray-600 hover:bg-gray-50"
-                    )}
-                  >
+                  <div key={item.href} className="space-y-0.5">
                     <div
                       className={cn(
-                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white shadow-sm",
-                        item.badgeColor || "bg-blue-600"
+                        "flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold no-underline transition",
+                        active ? "bg-amber-50 text-amber-900 border border-amber-200" : "text-gray-600 hover:bg-gray-50",
                       )}
                     >
-                      <Icon className="h-4 w-4" />
+                      <Link
+                        href={item.href}
+                        onClick={() => {
+                          beginNavigation();
+                          setMobileNavOpen(false);
+                        }}
+                        className="flex flex-1 items-center gap-2.5 text-inherit no-underline"
+                      >
+                        <div
+                          className={cn(
+                            "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white shadow-2xs",
+                            item.badgeColor || "bg-blue-600",
+                          )}
+                        >
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <span className="flex-1">{item.label}</span>
+                      </Link>
+
+                      {hasChildren ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleSection(item.href)}
+                          className="p-1 text-gray-400"
+                        >
+                          <ChevronDown
+                            className={cn(
+                              "h-4 w-4 transition-transform",
+                              isExpanded ? "rotate-0 text-amber-600" : "-rotate-90",
+                            )}
+                          />
+                        </button>
+                      ) : null}
                     </div>
-                    <span className="flex-1">{item.label}</span>
-                    <ChevronRight className="h-4 w-4 text-gray-400" />
-                  </Link>
+
+                    {hasChildren && isExpanded ? (
+                      <div className="ml-6 pl-3 border-l-2 border-amber-200 space-y-0.5 py-0.5">
+                        {item.children!.map((child) => {
+                          const ChildIcon = child.icon;
+                          return (
+                            <Link
+                              key={child.label}
+                              href={child.href}
+                              onClick={() => {
+                                beginNavigation();
+                                setMobileNavOpen(false);
+                              }}
+                              className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-gray-600 hover:bg-gray-100 no-underline"
+                            >
+                              <ChildIcon className="h-3.5 w-3.5 text-gray-400" />
+                              <span>{child.label}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
                 );
               })}
             </div>

@@ -339,14 +339,6 @@ export function StorefrontPage() {
                     <div className="rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-[var(--ink)] shadow-md backdrop-blur-md">
                       {item.categoryName}
                     </div>
-                    {item.is_permission === "YES" || String(item.is_permission).toUpperCase() === "YES" ? (
-                      <div 
-                        className="flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white shadow-md ring-2 ring-white transition hover:scale-110 cursor-help"
-                        title="P. Santo ni Permission Farjiyat"
-                      >
-                        <span className="text-[11px] font-black leading-none">★</span>
-                      </div>
-                    ) : null}
                   </div>
                   {isOutOfStock ? (
                     <div className="absolute right-3 top-3 rounded-full bg-[var(--danger)] px-2.5 py-1 text-[10px] font-bold text-white shadow-md">
@@ -386,10 +378,10 @@ export function StorefrontPage() {
                       </h4>
                       {item.is_permission === "YES" || String(item.is_permission).toUpperCase() === "YES" ? (
                         <span 
-                          className="inline-flex shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600 px-1.5 py-0.5 text-[10px] font-bold" 
-                          title="P. Santo ni Permission Farjiyat"
+                          className="inline-flex shrink-0 items-center justify-center rounded-full bg-red-50 border border-red-200 text-red-600 px-2 py-0.5 text-[10px] font-bold" 
+                          title="Permission Required"
                         >
-                          ★ Perm
+                          Permission
                         </span>
                       ) : null}
                     </div>
@@ -587,12 +579,6 @@ export function StorefrontPage() {
                   <h2 className="mt-4 text-2xl font-extrabold tracking-tight text-[var(--ink)] sm:text-3xl">
                     {selectedItem.name}
                   </h2>
-                  {selectedItem.is_permission === "YES" || String(selectedItem.is_permission).toUpperCase() === "YES" ? (
-                    <div className="mt-3 flex items-center gap-2 rounded-xl bg-amber-500/10 border border-amber-500/30 p-3 text-sm font-bold text-amber-700">
-                      <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" />
-                      <span>P. Santo ni permission farjiyat che</span>
-                    </div>
-                  ) : null}
                   {selectedItem.productId ? (
                     <p className="mt-1.5 text-sm font-bold tracking-widest text-[var(--ink-light)] uppercase">
                       ID: {selectedItem.productId}
