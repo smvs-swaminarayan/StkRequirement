@@ -65,14 +65,14 @@ function buildNavSections(activeRole: Role | null): NavItem[] {
         icon: ClipboardList,
       },
       {
-        href: "/masters",
+        href: "/masters/items",
         label: "Masters & Stock",
         badgeColor: "bg-emerald-600",
         icon: Boxes,
         children: [
-          { href: "/masters", label: "Items Master", icon: Package },
-          { href: "/masters", label: "Categories Master", icon: Tags },
-          { href: "/masters", label: "Stock Entries", icon: BarChart3 },
+          { href: "/masters/items", label: "Items Master", icon: Package },
+          { href: "/masters/categories", label: "Categories Master", icon: Tags },
+          { href: "/masters/stock", label: "Stock Entries", icon: BarChart3 },
         ],
       },
       {
@@ -88,15 +88,15 @@ function buildNavSections(activeRole: Role | null): NavItem[] {
         icon: Users,
       },
       {
-        href: "/reports",
+        href: "/reports/orders",
         label: "Reports Admin",
         badgeColor: "bg-purple-600",
         icon: Shield,
         children: [
-          { href: "/reports", label: "Order Report", icon: FileSpreadsheet },
-          { href: "/reports", label: "Stock Master Report", icon: BarChart3 },
-          { href: "/reports", label: "Item Usage Report", icon: TrendingUp },
-          { href: "/reports", label: "Memberwise Report", icon: UserCheck },
+          { href: "/reports/orders", label: "Order Report", icon: FileSpreadsheet },
+          { href: "/reports/stock", label: "Stock Master Report", icon: BarChart3 },
+          { href: "/reports/usage", label: "Item Usage Report", icon: TrendingUp },
+          { href: "/reports/members", label: "Memberwise Report", icon: UserCheck },
         ],
       },
     ];
@@ -117,13 +117,13 @@ function buildNavSections(activeRole: Role | null): NavItem[] {
         icon: ClipboardList,
       },
       {
-        href: "/masters",
+        href: "/masters/items",
         label: "Items & Stock",
         badgeColor: "bg-emerald-600",
         icon: Boxes,
         children: [
-          { href: "/masters", label: "Items Master", icon: Package },
-          { href: "/masters", label: "Stock Entries", icon: BarChart3 },
+          { href: "/masters/items", label: "Items Master", icon: Package },
+          { href: "/masters/stock", label: "Stock Entries", icon: BarChart3 },
         ],
       },
       {
@@ -133,14 +133,14 @@ function buildNavSections(activeRole: Role | null): NavItem[] {
         icon: MessageSquare,
       },
       {
-        href: "/reports",
+        href: "/reports/orders",
         label: "Reports Leader",
         badgeColor: "bg-purple-600",
         icon: Shield,
         children: [
-          { href: "/reports", label: "Assigned Order Report", icon: FileSpreadsheet },
-          { href: "/reports", label: "Assigned Stock Report", icon: BarChart3 },
-          { href: "/reports", label: "Item Usage Report", icon: TrendingUp },
+          { href: "/reports/orders", label: "Assigned Order Report", icon: FileSpreadsheet },
+          { href: "/reports/stock", label: "Assigned Stock Report", icon: BarChart3 },
+          { href: "/reports/usage", label: "Item Usage Report", icon: TrendingUp },
         ],
       },
     ];
@@ -160,13 +160,13 @@ function buildNavSections(activeRole: Role | null): NavItem[] {
       icon: History,
     },
     {
-      href: "/reports",
+      href: "/reports/orders",
       label: "My Reports",
       badgeColor: "bg-purple-600",
       icon: Shield,
       children: [
-        { href: "/reports", label: "My Order Report", icon: FileSpreadsheet },
-        { href: "/reports", label: "My Requested Items", icon: TrendingUp },
+        { href: "/reports/orders", label: "My Order Report", icon: FileSpreadsheet },
+        { href: "/reports/usage", label: "My Requested Items", icon: TrendingUp },
       ],
     },
   ];
@@ -197,8 +197,8 @@ export function AppShell({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [menuSearch, setMenuSearch] = useState("");
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    "/masters": true,
-    "/reports": true,
+    "/masters/items": true,
+    "/reports/orders": true,
   });
   const [optimisticRole, setOptimisticRole] = useState<Role | null>(activeRole);
   const [forgotModalOpen, setForgotModalOpen] = useState(false);
@@ -440,7 +440,7 @@ export function AppShell({
             {filteredNavItems.map((item) => {
               const hasChildren = Boolean(item.children?.length);
               const isExpanded = Boolean(expandedSections[item.href] || menuSearch.trim());
-              const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+              const parentActive = pathname === item.href || item.children?.some((c) => pathname === c.href) || (item.href !== "/dashboard" && pathname.startsWith(item.href.split("/")[1] ? `/${item.href.split("/")[1]}` : item.href));
               const Icon = item.icon;
 
               return (
@@ -454,7 +454,7 @@ export function AppShell({
                     }}
                     className={cn(
                       "flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-bold transition cursor-pointer select-none",
-                      active
+                      parentActive
                         ? "bg-amber-50/80 text-amber-900 font-extrabold shadow-2xs border border-amber-200/80"
                         : "text-gray-700 hover:bg-gray-50 hover:text-gray-900",
                     )}
@@ -502,6 +502,7 @@ export function AppShell({
                     <div className="ml-5 pl-3 border-l-2 border-amber-200/70 space-y-0.5 py-0.5">
                       {item.children!.map((child) => {
                         const ChildIcon = child.icon;
+                        const childActive = pathname === child.href;
                         return (
                           <Link
                             key={child.label}
@@ -509,12 +510,12 @@ export function AppShell({
                             onClick={() => beginNavigation()}
                             className={cn(
                               "flex items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] font-semibold no-underline transition",
-                              active
-                                ? "text-amber-900 hover:bg-amber-100/50"
+                              childActive
+                                ? "bg-amber-100/70 text-amber-900 font-bold"
                                 : "text-gray-500 hover:text-gray-900 hover:bg-gray-100/70",
                             )}
                           >
-                            <ChildIcon className="h-3.5 w-3.5 text-gray-400" />
+                            <ChildIcon className={cn("h-3.5 w-3.5", childActive ? "text-amber-600" : "text-gray-400")} />
                             <span className="truncate">{child.label}</span>
                           </Link>
                         );

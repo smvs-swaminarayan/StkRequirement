@@ -18,18 +18,33 @@ import type {
 } from "@/lib/firebase/types";
 import { where } from "firebase/firestore";
 
-export function useWorkspaceData(options?: { fetchItems?: boolean, categoryId?: string }) {
+export function useWorkspaceData(options?: {
+  fetchCategories?: boolean;
+  fetchItems?: boolean;
+  fetchOrders?: boolean;
+  fetchStockEntries?: boolean;
+  fetchUsers?: boolean;
+  categoryId?: string;
+}) {
   const { profile, workspaceProfile } = useAuth();
   const canReadTeamData = isSuperAdmin(profile);
   const canReadStockData = isSuperAdmin(workspaceProfile) || isLeader(workspaceProfile);
-  const categoriesState = useFirestoreCollection<CategoryRecord>("categories");
-  const itemsState = useFirestoreCollection<ItemRecord>("items", options?.categoryId && options.categoryId !== "ALL" ? [where("categoryId", "==", options.categoryId)] : undefined, { disabled: options?.fetchItems === false });
-  const ordersState = useFirestoreCollection<OrderRecord>("orders");
+  const categoriesState = useFirestoreCollection<CategoryRecord>("categories", undefined, {
+    disabled: options?.fetchCategories === false,
+  });
+  const itemsState = useFirestoreCollection<ItemRecord>(
+    "items",
+    options?.categoryId && options.categoryId !== "ALL" ? [where("categoryId", "==", options.categoryId)] : undefined,
+    { disabled: options?.fetchItems === false },
+  );
+  const ordersState = useFirestoreCollection<OrderRecord>("orders", undefined, {
+    disabled: options?.fetchOrders === false,
+  });
   const stockState = useFirestoreCollection<StockEntryRecord>("stockEntries", undefined, {
-    disabled: !canReadStockData,
+    disabled: !canReadStockData || options?.fetchStockEntries === false,
   });
   const usersState = useFirestoreCollection<AppUserProfile>("users", undefined, {
-    disabled: !canReadTeamData,
+    disabled: !canReadTeamData || options?.fetchUsers === false,
   });
 
   const categories = categoriesState.items

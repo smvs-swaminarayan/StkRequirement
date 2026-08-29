@@ -180,6 +180,56 @@ export async function executeMysqlQuery(payload: any) {
       return { id: insertId, ...preparedData };
     }
 
+    if (action === "setDoc") {
+      const idField = getIdField(colName);
+      const isUserCol = colName === "users" || colName === "usernames";
+      const numId = !isUserCol ? parseInt(String(id), 10) : NaN;
+      const targetId = !isNaN(numId) ? numId : id;
+
+      try {
+        const [existingRows] = await pool.execute(
+          `SELECT * FROM ${tableName} WHERE \`${idField}\` = ?`,
+          [targetId],
+        );
+        const existing = (existingRows as any[])[0];
+
+        if (existing) {
+          const { preparedData, keys } = prepareDataForMysql(colName, data);
+          const setClause = keys.map((k) => `\`${k}\` = ?`).join(", ");
+          const values = keys.map((k) => preparedData[k]);
+          values.push(targetId);
+          await pool.execute(
+            `UPDATE ${tableName} SET ${setClause} WHERE \`${idField}\` = ?`,
+            values,
+          );
+          return { id: targetId, ...preparedData };
+        } else {
+          const docData = { ...data };
+          if (isUserCol) {
+            docData[idField] = targetId;
+          } else if (!isNaN(numId)) {
+            docData[idField] = numId;
+          }
+          const { preparedData, keys } = prepareDataForMysql(colName, docData);
+          if (docData[idField] !== undefined && !keys.includes(idField)) {
+            keys.push(idField);
+            preparedData[idField] = docData[idField];
+          }
+          const columns = keys.map((k) => `\`${k}\``).join(", ");
+          const placeholders = keys.map(() => "?").join(", ");
+          const values = keys.map((k) => preparedData[k]);
+          await pool.execute(
+            `INSERT INTO ${tableName} (${columns}) VALUES (${placeholders})`,
+            values,
+          );
+          return { id: targetId, ...preparedData };
+        }
+      } catch (err: any) {
+        console.error("setDoc MySQL error:", err);
+        throw err;
+      }
+    }
+
     if (action === "updateDoc") {
       const { preparedData, keys } = prepareDataForMysql(colName, data);
       const idField = getIdField(colName);
@@ -193,7 +243,7 @@ export async function executeMysqlQuery(payload: any) {
 
     if (action === "deleteDoc") {
       const idField = getIdField(colName);
-      await pool.execute(`DELETE FROM ${tableName} WHERE \`${idField}\` = ?`, [id]);
+      await pool.execute(`UPDATE ${tableName} SET is_deleted = 1, deletedAt = ? WHERE \`${idField}\` = ?`, [new Date().toISOString(), id]);
       return { id };
     }
 

@@ -7,6 +7,9 @@
 /.next/
 /out/
 /build/
+/dist/
+/deploy-bundle/
+*.zip
 
 # Local databases and backups
 /*.sqlite

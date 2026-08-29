@@ -54,7 +54,11 @@ function normalizeRoles(values: string[]) {
 
 export function TeamView() {
   const { profile: baseProfile, workspaceProfile: profile } = useAuth();
-  const { loading, categories, users } = useWorkspaceData();
+  const { loading, categories, users } = useWorkspaceData({
+    fetchItems: false,
+    fetchOrders: false,
+    fetchStockEntries: false,
+  });
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState("");
