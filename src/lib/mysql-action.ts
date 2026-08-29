@@ -28,12 +28,12 @@ const removedFields: Record<string, string[]> = {
 };
 
 function getTable(colName: string) {
-  const prefix = process.env.DB_PREFIX || "";
+  const prefix = process.env.DB_PREFIX !== undefined && process.env.DB_PREFIX !== "" ? process.env.DB_PREFIX : "StkRequirement_";
   return `\`${prefix}${colName}\``;
 }
 
 function getSelectQuery(colName: string) {
-  const prefix = process.env.DB_PREFIX || "";
+  const prefix = process.env.DB_PREFIX !== undefined && process.env.DB_PREFIX !== "" ? process.env.DB_PREFIX : "StkRequirement_";
   const tUsers = `\`${prefix}users\``;
   const tCat = `\`${prefix}categories\``;
   const tItems = `\`${prefix}items\``;
