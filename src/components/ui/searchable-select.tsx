@@ -1,5 +1,7 @@
 "use client";
 
+import { matchesSearch } from "@/lib/gujarati-search";
+
 import { useMemo, useState, useRef, useEffect } from "react";
 import { Check, ChevronDown, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -41,9 +43,9 @@ export function SearchableSelect({
   }, []);
 
   const filteredOptions = useMemo(() => {
-    const needle = search.trim().toLowerCase();
+    const needle = search.trim();
     if (!needle) return options;
-    return options.filter((option) => option.label.toLowerCase().includes(needle));
+    return options.filter((option) => matchesSearch(option.label, needle) || matchesSearch(option.value, needle));
   }, [options, search]);
 
   const selectedOption = useMemo(

@@ -29,6 +29,11 @@ import {
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import { useAuth } from "@/components/providers/auth-provider";
+import { Bell } from "lucide-react";
+import { LowStockAlertModal, type LowStockItemInfo } from "@/components/ui/low-stock-alert-modal";
+import { useFirestoreCollection } from "@/hooks/use-firestore-collection";
+import { usePublicStockAvailability } from "@/hooks/use-public-stock-availability";
+import type { ItemRecord } from "@/lib/firebase/types";
 import { useAppLoading } from "@/components/providers/loading-provider";
 import { getFirebaseErrorMessage } from "@/lib/firebase/error-message";
 import { getRoleLabel } from "@/lib/permissions";
@@ -214,6 +219,54 @@ export function AppShell({
     setOptimisticRole(activeRole);
   }, [activeRole]);
 
+
+  const isSuperAdminOrLeader = optimisticRole === "SUPER_ADMIN" || optimisticRole === "LEADER";
+  const { items: allActiveItems } = useFirestoreCollection<ItemRecord>("items");
+  const { stockMap, variantMap } = usePublicStockAvailability();
+  const [lowStockModalOpen, setLowStockModalOpen] = useState(false);
+
+  const lowStockItems = useMemo<LowStockItemInfo[]>(() => {
+    if (!isSuperAdminOrLeader || !allActiveItems.length) return [];
+
+    const activeItems = allActiveItems.filter(
+      (i) => !i.is_deleted && i.active !== false && !i.deletedAt
+    );
+
+    const alerts: LowStockItemInfo[] = [];
+
+    for (const item of activeItems) {
+      const overallAvailable = stockMap[String(item.id)] ?? 0;
+      const hasSizes = Boolean(item.hasVariants && item.variants?.length);
+
+      let variantStock: Record<string, number> | undefined;
+      let hasAnyLowOrOutVariant = false;
+
+      if (hasSizes) {
+        variantStock = {};
+        for (const v of item.variants!) {
+          const vQty = variantMap[`${item.id}__${v}`] ?? 0;
+          variantStock[v] = vQty;
+          if (vQty <= 1) {
+            hasAnyLowOrOutVariant = true;
+          }
+        }
+      }
+
+      if (overallAvailable <= 1 || hasAnyLowOrOutVariant) {
+        alerts.push({
+          item,
+          available: overallAvailable,
+          status: overallAvailable <= 0 ? "OUT_OF_STOCK" : "LOW_STOCK",
+          variantStock,
+        });
+      }
+    }
+
+    return alerts.sort((a, b) => a.available - b.available);
+  }, [isSuperAdminOrLeader, allActiveItems, stockMap, variantMap]);
+
+  const lowStockCount = lowStockItems.length;
+
   const navItems = useMemo(() => buildNavSections(optimisticRole), [optimisticRole]);
 
   const filteredNavItems = useMemo(() => {
@@ -303,15 +356,27 @@ export function AppShell({
           </Link>
         </div>
 
-        {/* Center: Active Role Badge */}
-        <div className="hidden items-center gap-2 md:flex">
-          <span className="rounded-full border border-amber-400/30 bg-amber-400/15 px-3 py-1 text-xs font-bold text-amber-300">
+        {/* Right: Active Role Badge + Low Stock Notification Bell + User Avatar Circle */}
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          {/* Active Role Badge right beside user profile */}
+          <span className="inline-flex items-center rounded-full border border-amber-400/30 bg-amber-400/15 px-3 py-1 text-xs font-bold text-amber-300 shadow-2xs">
             {getRoleLabel(optimisticRole ?? workspaceProfile)}
           </span>
-        </div>
 
-        {/* Right: User Avatar Circle with Pure Hover Dropdown */}
-        <div className="flex items-center gap-2">
+          {/* Low Stock Warning Bell Notification Icon */}
+          {isSuperAdminOrLeader && lowStockCount > 0 ? (
+            <button
+              type="button"
+              onClick={() => setLowStockModalOpen(true)}
+              className="relative flex items-center justify-center h-8 w-8 rounded-full bg-rose-500/20 text-rose-300 hover:bg-rose-500 hover:text-white transition animate-bounce ring-2 ring-rose-400/50 shadow-md cursor-pointer"
+              title={`${lowStockCount} Items Low / Out of Stock! Click to view alert details`}
+            >
+              <Bell className="h-4 w-4 animate-pulse text-rose-400" />
+              <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[9px] font-black text-white shadow-sm ring-1 ring-white">
+                {lowStockCount}
+              </span>
+            </button>
+          ) : null}
           <div className="relative group/user py-1">
             <div
               className="flex items-center justify-center rounded-full cursor-pointer transition hover:scale-105"
@@ -668,6 +733,11 @@ export function AppShell({
         </div>
       ) : null}
 
+<LowStockAlertModal
+        open={lowStockModalOpen}
+        onClose={() => setLowStockModalOpen(false)}
+        lowStockItems={lowStockItems}
+      />
       {/* Forgot Password Modal */}
       <Modal
         open={forgotModalOpen}

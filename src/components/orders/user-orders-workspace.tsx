@@ -1,4 +1,6 @@
 "use client";
+
+import { matchesSearch } from "@/lib/gujarati-search";
 /* eslint-disable @next/next/no-img-element */
 
 import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
@@ -14,7 +16,7 @@ import {
   Search,
   ShoppingCart,
   Sparkles,
-  Trash2,
+  Trash2, Truck, XCircle,
   X,
   ZoomIn,
 } from "lucide-react";
@@ -41,7 +43,7 @@ const historyStatuses = ["ALL", "PENDING", "APPROVED", "REJECTED", "DELIVERED"] 
 
 export function UserOrdersWorkspace({ activeView }: { activeView: UserOrdersView }) {
   const { workspaceProfile: profile } = useAuth();
-  const { categories, items, orders } = useWorkspaceData({ fetchItems: false });
+  const { categories, items, orders } = useWorkspaceData();
   const [requestCategoryId, setRequestCategoryId] = useState("");
   const { items: requestItems, loading: requestItemsLoading } = useFirestoreCollection<ItemRecord>("items", requestCategoryId ? [require("firebase/firestore").where("categoryId", "==", requestCategoryId)] : undefined, { disabled: !requestCategoryId });
   const { getAvailableStock } = usePublicStockAvailability();
@@ -84,7 +86,7 @@ export function UserOrdersWorkspace({ activeView }: { activeView: UserOrdersView
   const [zoomPos, setZoomPos] = useState({ x: 0, y: 0, active: false });
   const itemIdsKey = items
     .map((item) => item.id)
-    .sort((left, right) => left.localeCompare(right))
+    .map(id => String(id)).sort((left, right) => left.localeCompare(right, undefined, { numeric: true }))
     .join("|");
 
   const cartQtyFor = useCallback(
@@ -105,23 +107,7 @@ export function UserOrdersWorkspace({ activeView }: { activeView: UserOrdersView
     });
   }, [selectedItem, cartQtyFor, getAvailableStock]);
 
-  useEffect(() => {
-    const activeItemIds = itemIdsKey ? new Set(itemIdsKey.split("|")) : new Set<string>();
-    setCart((current) => {
-      if (!activeItemIds.size) {
-        // Items may still be loading; don't wipe cart just because the list is empty.
-        return current;
-      }
-
-      const nextCart = current.filter((line) => activeItemIds.has(line.itemId));
-
-      if (nextCart.length === current.length) {
-        return current;
-      }
-
-      return nextCart;
-    });
-  }, [itemIdsKey, setCart]);
+// Cart persistence managed by CartProvider
 
   
   const submitSpecialRequest = async (type: 'OUT_OF_STOCK' | 'NEW_ITEM') => {
@@ -551,13 +537,25 @@ export function UserOrdersWorkspace({ activeView }: { activeView: UserOrdersView
           {filteredOrders.length ? (
             <div className="space-y-3">
               {filteredOrders.map((order) => {
-                const orderItem = items.find((item) => item.id === order.itemId);
+                const orderItem = items.find((item) => {
+                  if (Number(item.id) === Number(order.itemId) || String(item.id) === String(order.itemId)) return true;
+                  const targetName = (order.itemName || order.summary || "").toLowerCase().trim();
+                  const iname = (item.name || "").toLowerCase().trim();
+                  if (!iname || !targetName) return false;
+                  if (iname === targetName) return true;
+                  if (targetName.includes(iname) || iname.includes(targetName)) return true;
+                  if (order.notes && order.notes.toLowerCase().includes(iname)) return true;
+                  return false;
+                });
+                const isDelivered = order.status === "DELIVERED";
+                const isRejected = order.status === "REJECTED";
+
                 return (
                   <button
                     key={order.id}
                     type="button"
                     onClick={() => setHistoryOpenOrderId(order.id)}
-                    className="stk-card w-full overflow-hidden text-left transition hover:shadow-[var(--shadow-hover)]"
+                    className="stk-card relative w-full overflow-hidden text-left transition hover:shadow-[var(--shadow-hover)] group"
                   >
                     <div className="grid gap-4 p-4 xl:grid-cols-[180px_minmax(0,1fr)]">
                       <div className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--paper)]">
@@ -589,9 +587,14 @@ export function UserOrdersWorkspace({ activeView }: { activeView: UserOrdersView
                                 </span>
                               ) : null}
                             </div>
-                            <h4 className="mt-1 text-lg font-bold text-[var(--ink)]">
-                              {order.itemName}
-                            </h4>
+                            <h4 className="mt-1 text-lg font-bold text-[var(--ink)] flex items-center gap-2">
+    <span>{order.itemName}</span>
+    {order.variant ? (
+      <span className="inline-flex items-center text-xs font-black px-2 py-0.5 rounded-md bg-purple-100 text-purple-900 border border-purple-200">
+        Size: {order.variant}
+      </span>
+    ) : null}
+  </h4>
                           </div>
                           <StatusBadge status={order.status} />
                         </div>
@@ -635,6 +638,36 @@ export function UserOrdersWorkspace({ activeView }: { activeView: UserOrdersView
                         </p>
                       </div>
                     </div>
+
+                    {/* FROSTED BLUR OVERLAY FOR DELIVERED ORDERS */}
+                    {isDelivered && (
+                      <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-[2.5px] rounded-2xl flex flex-col items-center justify-center z-10 p-4 text-center transition group-hover:bg-slate-950/55">
+                        <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-500 text-slate-950 text-xs font-black uppercase tracking-wider shadow-lg border border-emerald-400">
+                          <Truck className="h-4 w-4" /> DELIVERED
+                        </span>
+                        <span className="mt-2 text-xs font-bold text-emerald-200">
+                          {formatDate(order.deliveredAt || order.updatedAt || order.createdAt)}
+                        </span>
+                        <span className="mt-2 text-xs font-bold text-white underline hover:text-emerald-300">
+                          Click to View Details
+                        </span>
+                      </div>
+                    )}
+
+                    {/* FROSTED BLUR OVERLAY FOR REJECTED ORDERS (RED THEME) */}
+                    {isRejected && (
+                      <div className="absolute inset-0 bg-rose-950/70 backdrop-blur-[2.5px] rounded-2xl flex flex-col items-center justify-center z-10 p-4 text-center transition group-hover:bg-rose-950/60">
+                        <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-rose-600 text-white text-xs font-black uppercase tracking-wider shadow-lg border border-rose-500">
+                          <XCircle className="h-4 w-4" /> REJECTED
+                        </span>
+                        <span className="mt-2 text-xs font-bold text-rose-200">
+                          {formatDate(order.rejectedAt || order.updatedAt || order.createdAt)}
+                        </span>
+                        <span className="mt-2 text-xs font-bold text-white underline hover:text-rose-300">
+                          Click to View Details
+                        </span>
+                      </div>
+                    )}
                   </button>
                 );
               })}
@@ -652,16 +685,23 @@ export function UserOrdersWorkspace({ activeView }: { activeView: UserOrdersView
         open={historyOpenOrderId !== null}
         onClose={() => setHistoryOpenOrderId(null)}
         title={selectedHistoryOrder ? selectedHistoryOrder.itemName : "Order details"}
-        description={selectedHistoryOrder ? `Category: ${selectedHistoryOrder.categoryName}` : undefined}
+        description={selectedHistoryOrder ? `Category: ${selectedHistoryOrder.categoryName} ${selectedHistoryOrder.variant ? `• Size: ${selectedHistoryOrder.variant}` : ""}` : undefined}
       >
         {selectedHistoryOrder ? (
           <div className="space-y-4">
             <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--paper)] p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-[var(--ink-soft)]">
-                    Current status
-                  </p>
+                  <div className="flex items-center gap-2 mb-2">
+    {selectedHistoryOrder.variant ? (
+      <span className="text-xs font-black px-3 py-1 rounded-xl bg-purple-600 text-white shadow-xs border border-purple-700">
+        👕 Size: {selectedHistoryOrder.variant}
+      </span>
+    ) : null}
+  </div>
+  <p className="text-xs font-bold uppercase tracking-wider text-[var(--ink-soft)]">
+    Current status
+  </p>
                   <div className="mt-2">
                     <StatusBadge status={selectedHistoryOrder.status} />
                   </div>
@@ -826,10 +866,17 @@ export function UserOrdersWorkspace({ activeView }: { activeView: UserOrdersView
                               </span>
                             ) : null}
                           </div>
-                          <h4 className="mt-0.5 text-sm font-bold text-[var(--ink)]">{line.item.name}</h4>
+                          <h4 className="mt-0.5 text-sm font-bold text-[var(--ink)] flex items-center gap-2">
+    <span>{line.item.name}</span>
+    {line.variant ? (
+      <span className="inline-flex items-center text-[10px] font-black px-2 py-0.5 rounded-md bg-purple-100 text-purple-900 border border-purple-200">
+        Size: {line.variant}
+      </span>
+    ) : null}
+  </h4>
                           <p className="text-xs text-[var(--ink-soft)]">Unit: {line.item.unit}</p>
                           {(() => {
-                            const avail = getAvailableStock(line.itemId);
+                            const avail = getAvailableStock(line.itemId, line.variant);
                             const over = line.qty > avail;
                             return (
                               <p

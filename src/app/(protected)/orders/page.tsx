@@ -1,5 +1,5 @@
 import { OrdersView } from "@/components/orders/orders-view";
 
 export default function OrdersPage() {
-  return <OrdersView userView="cart" />;
+  return <OrdersView userView="history" />;
 }

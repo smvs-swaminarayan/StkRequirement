@@ -13,8 +13,8 @@ const pool = mysql.createPool({
   queueLimit: 0
 });
 
-const jsonFields = ["roles", "assignedCategoryIds", "images", "imageCrop"];
-const booleanFields = ["temporaryPasswordIssued"];
+const jsonFields = ["roles", "assignedCategoryIds", "images", "imageCrop", "variants"];
+const booleanFields = ["temporaryPasswordIssued", "hasVariants"];
 
 const removedFields: Record<string, string[]> = {
   users: ['usernameLower', 'deletedByName', 'primaryRole', 'categoryIds'],
@@ -93,8 +93,8 @@ function parseRow(row: any) {
   }
 
   for (const field of booleanFields) {
-    if (parsed[field] !== undefined) {
-      parsed[field] = parsed[field] === 1;
+    if (parsed[field] !== undefined && parsed[field] !== null) {
+      parsed[field] = parsed[field] === 1 || parsed[field] === "1" || parsed[field] === true;
     }
   }
 
@@ -105,7 +105,43 @@ function parseRow(row: any) {
   return parsed;
 }
 
+
+let _migrationChecked = false;
+async function ensureMysqlSchemaMigration() {
+  if (_migrationChecked) return;
+  try {
+    const prefix = process.env.DB_PREFIX !== undefined && process.env.DB_PREFIX !== "" ? process.env.DB_PREFIX : "StkRequirement_";
+    
+    // Check items columns
+    const [itemCols] = await pool.execute(`SHOW COLUMNS FROM \`${prefix}items\` LIKE 'hasVariants'`);
+    if (!(itemCols as any[]).length) {
+      await pool.execute(`ALTER TABLE \`${prefix}items\` ADD COLUMN \`hasVariants\` TINYINT(1) DEFAULT 0`);
+      await pool.execute(`ALTER TABLE \`${prefix}items\` ADD COLUMN \`variants\` TEXT NULL`);
+      console.log("[MySQL Migration] Added hasVariants & variants columns to items table");
+    }
+
+    // Check stockEntries columns
+    const [stockCols] = await pool.execute(`SHOW COLUMNS FROM \`${prefix}stockEntries\` LIKE 'variant'`);
+    if (!(stockCols as any[]).length) {
+      await pool.execute(`ALTER TABLE \`${prefix}stockEntries\` ADD COLUMN \`variant\` VARCHAR(255) NULL`);
+      console.log("[MySQL Migration] Added variant column to stockEntries table");
+    }
+
+    // Check orders columns
+    const [orderCols] = await pool.execute(`SHOW COLUMNS FROM \`${prefix}orders\` LIKE 'variant'`);
+    if (!(orderCols as any[]).length) {
+      await pool.execute(`ALTER TABLE \`${prefix}orders\` ADD COLUMN \`variant\` VARCHAR(255) NULL`);
+      console.log("[MySQL Migration] Added variant column to orders table");
+    }
+
+    _migrationChecked = true;
+  } catch (err) {
+    console.warn("[MySQL Migration] Note:", err);
+  }
+}
+
 export async function executeMysqlQuery(payload: any) {
+  await ensureMysqlSchemaMigration();
   try {
     const { action, collection, id, data, constraints } = payload;
     let colName = typeof collection === "string" ? collection : collection?.path || String(collection || "");

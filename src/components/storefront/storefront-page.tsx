@@ -1,4 +1,6 @@
 "use client";
+
+import { matchesSearch } from "@/lib/gujarati-search";
 /* eslint-disable @next/next/no-img-element */
 
 import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
@@ -43,6 +45,7 @@ export function StorefrontPage() {
   const { cart, addToCart: addToCartBase } = useCart();
   const router = useRouter();
   const [search, setSearch] = useState("");
+  const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
   const [newRequestOpen, setNewRequestOpen] = useState(false);
   const [requestItem, setRequestItem] = useState<{ id: number, name: string, categoryId: number, categoryName: string } | null>(null);
   const [requestQty, setRequestQty] = useState(1);
@@ -87,7 +90,7 @@ export function StorefrontPage() {
 
 
   const cartQtyFor = useCallback(
-    (itemId: number) => cart.find((l) => l.itemId === itemId)?.qty ?? 0,
+    (itemId: number | string) => cart.find((l) => String(l.itemId) === String(itemId))?.qty ?? 0,
     [cart],
   );
 
@@ -105,21 +108,29 @@ export function StorefrontPage() {
   }, [selectedItem, cartQtyFor, getAvailableStock]);
 
   const filteredItems = useMemo(() => {
-    const query = deferredSearch.trim().toLowerCase();
+    const query = deferredSearch.trim();
     return items.filter((item) => {
       const matchesCategory = selectedCategoryId === "ALL" ? true : String(item.categoryId) === String(selectedCategoryId);
-      const haystack = `${item.name} ${item.categoryName} ${item.unit}`.toLowerCase();
-      return matchesCategory && (query ? haystack.includes(query) : true);
+      const matchesText =
+        matchesSearch(item.name, query) ||
+        matchesSearch(item.categoryName, query) ||
+        matchesSearch(item.productId, query) ||
+        (item.variants && item.variants.some((v) => matchesSearch(v, query)));
+      return matchesCategory && matchesText;
     });
   }, [deferredSearch, items, selectedCategoryId]);
 
   const searchSuggestions = useMemo(() => {
-    const query = deferredSearch.trim().toLowerCase();
+    const query = deferredSearch.trim();
     if (!query) return [];
     return items
       .filter((item) => {
-        const haystack = `${item.name} ${item.categoryName} ${item.unit}`.toLowerCase();
-        return haystack.includes(query);
+        return (
+          matchesSearch(item.name, query) ||
+          matchesSearch(item.categoryName, query) ||
+          matchesSearch(item.productId, query) ||
+          (item.variants && item.variants.some((v) => matchesSearch(v, query)))
+        );
       })
       .slice(0, 6);
   }, [deferredSearch, items]);
@@ -191,7 +202,7 @@ export function StorefrontPage() {
     }
   };
 
-  const addToCart = (itemId: number, openCart = false, qty = 1) => {
+  const addToCart = (itemId: number, openCart = false, qty = 1, variant?: string) => {
     const stock = getAvailableStock(itemId);
     const alreadyInCart = cartQtyFor(itemId);
     if (alreadyInCart + qty > stock) {
@@ -202,7 +213,7 @@ export function StorefrontPage() {
       );
       return;
     }
-    addToCartBase(itemId, { qty });
+    addToCartBase(itemId, { qty, variant });
     if (openCart) {
       if (isAuthenticated) {
         router.push("/orders/cart");
@@ -213,7 +224,7 @@ export function StorefrontPage() {
     toast.success("Added to cart.");
   };
 
-  const handleBuyNow = (item: WithId<ItemRecord>, qty: number, notes: string) => {
+  const handleBuyNow = (item: WithId<ItemRecord>, qty: number, notes: string, variant?: string) => {
     const stock = getAvailableStock(item.id);
     const alreadyInCart = cartQtyFor(item.id);
     if (alreadyInCart + qty > stock) {
@@ -224,7 +235,7 @@ export function StorefrontPage() {
       );
       return;
     }
-    addToCartBase(item.id, { qty, notes });
+    addToCartBase(item.id, { qty, notes, variant });
     toast.success(`Added ${qty} × ${item.name} to cart!`);
     setSelectedItem(null);
 
@@ -612,24 +623,14 @@ export function StorefrontPage() {
                   </div>
 
                   {(() => {
-                    const detailStock = getAvailableStock(selectedItem.id);
-                    const already = cartQtyFor(selectedItem.id);
-                    const cap = Math.max(0, detailStock - already);
-                    if (detailStock > 0 && cap <= 0) {
-                      return (
-                        <p className="mt-2 text-xs font-semibold text-amber-700">
-                          All available units are already in your cart.
-                        </p>
-                      );
-                    }
-                    return null;
-                  })()}
+                    const activeVariant = selectedItem.hasVariants && selectedItem.variants?.length
+                      ? (selectedVariants[selectedItem.id] || selectedItem.variants[0])
+                      : undefined;
 
-                  <hr className="my-4 border-[var(--border)]" />
+                    const detailStock = activeVariant
+                      ? getAvailableStock(selectedItem.id, activeVariant)
+                      : getAvailableStock(selectedItem.id);
 
-                  {/* Quantity selector */}
-                  {(() => {
-                    const detailStock = getAvailableStock(selectedItem.id);
                     const already = cartQtyFor(selectedItem.id);
                     const cap = Math.max(0, detailStock - already);
                     const detailOutOfStock = detailStock <= 0;
@@ -638,113 +639,172 @@ export function StorefrontPage() {
                     const overStock = cap > 0 && detailQty > maxQty;
 
                     return (
-                      <div>
-                        <p className="text-sm font-semibold text-[var(--ink)]">Quantity</p>
-                        <div
-                          className={cn(
-                            "mt-2 inline-flex items-center rounded-[var(--radius-md)] border",
-                            overStock ? "border-[var(--danger)]" : "border-[var(--border)]",
-                          )}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => setDetailQty(Math.max(1, detailQty - 1))}
-                            disabled={qtyDisabled}
-                            className="px-3 py-2 text-[var(--ink-soft)] hover:bg-[var(--paper)] transition disabled:opacity-40"
-                          >
-                            <Minus className="h-4 w-4" />
-                          </button>
-                          <input
-                            type="number"
-                            min={1}
-                            max={maxQty}
-                            value={detailQty}
-                            onChange={(e) => {
-                              const raw = Number(e.target.value) || 1;
-                              const val = cap > 0 ? Math.min(Math.max(1, raw), cap) : 1;
-                              setDetailQty(val);
-                            }}
-                            disabled={qtyDisabled}
-                            className={cn(
-                              "w-14 border-x py-2 text-center text-sm font-bold outline-none",
-                              overStock ? "border-[var(--danger)] text-[var(--danger)]" : "border-[var(--border)] text-[var(--ink)]",
-                            )}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (cap <= 0) {
-                                toast.error(
-                                  detailOutOfStock
-                                    ? "This item is out of stock."
-                                    : "No more units available to add.",
+                      <>
+                        {/* 👕 Size / Variant Selector with Live Stock Badges */}
+                        {selectedItem.hasVariants && selectedItem.variants?.length ? (
+                          <div className="mt-3.5 p-3.5 rounded-2xl bg-purple-50/70 border border-purple-200 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <label className="text-xs font-black text-purple-950 flex items-center gap-1.5">
+                                <span>👕 Select Size:</span>
+                                <span className="text-purple-700 bg-purple-100 px-2 py-0.5 rounded-md font-extrabold">
+                                  Size {activeVariant}
+                                </span>
+                              </label>
+                              <span className="text-[11px] font-bold text-purple-800">
+                                Available: <strong className="text-purple-950">{detailStock}</strong>
+                              </span>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2 pt-1">
+                              {selectedItem.variants.map((v) => {
+                                const isSelected = activeVariant === v;
+                                const sizeStock = getAvailableStock(selectedItem.id, v);
+                                return (
+                                  <button
+                                    key={v}
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedVariants((curr) => ({ ...curr, [selectedItem.id]: v }));
+                                      setDetailQty(1);
+                                    }}
+                                    className={cn(
+                                      "px-3.5 py-1.5 rounded-xl text-xs font-black transition cursor-pointer border flex items-center gap-1.5",
+                                      isSelected
+                                        ? "bg-purple-600 text-white border-purple-700 shadow-xs scale-105"
+                                        : "bg-white text-purple-950 border-purple-200 hover:bg-purple-100"
+                                    )}
+                                  >
+                                    <span>Size {v}</span>
+                                    <span
+                                      className={cn(
+                                        "text-[10px] px-1.5 py-0.5 rounded-md font-bold",
+                                        sizeStock > 0
+                                          ? (isSelected ? "bg-purple-800 text-purple-100" : "bg-emerald-100 text-emerald-800")
+                                          : (isSelected ? "bg-purple-800 text-purple-200" : "bg-rose-100 text-rose-700")
+                                      )}
+                                    >
+                                      {sizeStock > 0 ? `${sizeStock} left` : "0 stock"}
+                                    </span>
+                                  </button>
                                 );
-                                return;
-                              }
-                              if (detailQty + 1 > cap) {
-                                toast.error(`You can add at most ${cap} more (stock ${detailStock}, ${already} in cart).`);
-                                return;
-                              }
-                              setDetailQty(detailQty + 1);
-                            }}
-                            disabled={qtyDisabled}
-                            className="px-3 py-2 text-[var(--ink-soft)] hover:bg-[var(--paper)] transition disabled:opacity-40"
-                          >
-                            <Plus className="h-4 w-4" />
-                          </button>
-                        </div>
-                        {overStock ? (
-                          <p className="mt-1.5 flex items-center gap-1 text-xs font-semibold text-[var(--danger)]">
-                            <AlertTriangle className="h-3.5 w-3.5" />
-                            You can add at most {cap} (stock {detailStock}, {already} in cart).
-                          </p>
+                              })}
+                            </div>
+                          </div>
                         ) : null}
-                      </div>
+
+                        {detailStock > 0 && cap <= 0 && (
+                          <p className="mt-2 text-xs font-bold text-amber-700">
+                            All available units of Size {activeVariant || ""} are already in your cart.
+                          </p>
+                        )}
+
+                        <hr className="my-4 border-[var(--border)]" />
+
+                        {/* Quantity selector */}
+                        <div>
+                          <p className="text-xs font-bold text-[var(--ink)]">Quantity</p>
+                          <div
+                            className={cn(
+                              "mt-2 inline-flex items-center rounded-xl border bg-gray-50",
+                              overStock ? "border-[var(--danger)]" : "border-[var(--border)]"
+                            )}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setDetailQty(Math.max(1, detailQty - 1))}
+                              disabled={qtyDisabled}
+                              className="px-3 py-2 text-[var(--ink-soft)] hover:bg-[var(--paper)] transition disabled:opacity-40"
+                            >
+                              <Minus className="h-4 w-4" />
+                            </button>
+                            <input
+                              type="number"
+                              min={1}
+                              max={maxQty}
+                              value={detailQty}
+                              onChange={(e) => {
+                                const raw = Number(e.target.value) || 1;
+                                const val = cap > 0 ? Math.min(Math.max(1, raw), cap) : 1;
+                                setDetailQty(val);
+                              }}
+                              disabled={qtyDisabled}
+                              className={cn(
+                                "w-14 border-x py-2 text-center text-xs font-bold outline-none bg-white",
+                                overStock ? "border-[var(--danger)] text-[var(--danger)]" : "border-[var(--border)] text-[var(--ink)]"
+                              )}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (cap <= 0) {
+                                  toast.error(
+                                    detailOutOfStock
+                                      ? "This size is currently out of stock."
+                                      : "No more units available to add for this size."
+                                  );
+                                  return;
+                                }
+                                if (detailQty + 1 > cap) {
+                                  toast.error(`You can add at most ${cap} for Size ${activeVariant || ""} (stock ${detailStock}).`);
+                                  return;
+                                }
+                                setDetailQty(detailQty + 1);
+                              }}
+                              disabled={qtyDisabled}
+                              className="px-3 py-2 text-[var(--ink-soft)] hover:bg-[var(--paper)] transition disabled:opacity-40"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </button>
+                          </div>
+                          {overStock ? (
+                            <p className="mt-1.5 flex items-center gap-1 text-xs font-semibold text-[var(--danger)]">
+                              <AlertTriangle className="h-3.5 w-3.5" />
+                              You can add at most {cap} (stock {detailStock}, {already} in cart).
+                            </p>
+                          ) : null}
+                        </div>
+
+                        {/* Notes */}
+                        <label className="mt-4 block text-xs font-bold text-[var(--ink)]">
+                          Note (optional)
+                          <textarea
+                            id="storefront-detail-notes"
+                            rows={2}
+                            className="stk-input mt-1.5"
+                            placeholder="Any special instructions..."
+                          />
+                        </label>
+
+                        {/* Buy Button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const notesEl = document.getElementById("storefront-detail-notes") as HTMLTextAreaElement | null;
+                            const notes = notesEl?.value?.trim() ?? "";
+                            handleBuyNow(selectedItem, detailQty, notes, activeVariant);
+                          }}
+                          disabled={detailStock <= 0 || cap <= 0}
+                          className="btn-action mt-4 w-full py-3 text-sm font-black disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                        >
+                          {detailStock <= 0
+                            ? "Out of Stock"
+                            : `Buy Now — ${detailQty} ${selectedItem.unit} ${activeVariant ? `(Size: ${activeVariant})` : ""}`}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            addToCart(selectedItem.id, false, detailQty, activeVariant);
+                            setSelectedItem(null);
+                          }}
+                          disabled={detailStock <= 0 || cap < detailQty}
+                          className="btn-secondary mt-2 w-full disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                        >
+                          Add to cart & continue shopping
+                        </button>
+                      </>
                     );
                   })()}
-
-                  {/* Notes */}
-                  <label className="mt-4 block text-sm font-semibold text-[var(--ink)]">
-                    Note (optional)
-                    <textarea
-                      id="storefront-detail-notes"
-                      rows={2}
-                      className="stk-input mt-1.5"
-                      placeholder="Any special instructions..."
-                    />
-                  </label>
-
-                  {/* Buy Button */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const notesEl = document.getElementById("storefront-detail-notes") as HTMLTextAreaElement | null;
-                      const notes = notesEl?.value?.trim() ?? "";
-                      handleBuyNow(selectedItem, detailQty, notes);
-                    }}
-                    disabled={
-                      getAvailableStock(selectedItem.id) <= 0 ||
-                      Math.max(0, getAvailableStock(selectedItem.id) - cartQtyFor(selectedItem.id)) <= 0
-                    }
-                    className="btn-action mt-4 w-full py-3 text-base disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {`Buy Now — ${detailQty} ${selectedItem.unit}`}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      addToCart(selectedItem.id, false, detailQty);
-                      setSelectedItem(null);
-                    }}
-                    disabled={
-                      getAvailableStock(selectedItem.id) <= 0 ||
-                      Math.max(0, getAvailableStock(selectedItem.id) - cartQtyFor(selectedItem.id)) < detailQty
-                    }
-                    className="btn-secondary mt-2 w-full disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Add to cart & continue shopping
-                  </button>
                 </div>
               </div>
             </div>

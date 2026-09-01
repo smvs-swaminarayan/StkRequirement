@@ -83,6 +83,8 @@ export type ItemRecord = {
   createdByName?: string | null;
   createdByRole?: Role | null;
   is_permission?: "YES" | "NO" | string | boolean | null;
+  hasVariants?: boolean;
+  variants?: string[];
   active: boolean;
   is_deleted?: boolean;
   deletedAt?: Timestamp | null;
@@ -101,6 +103,7 @@ export type StockEntryRecord = {
   itemName: string;
   qty: number;
   unit?: string | null;
+  variant?: string | null;
   notes: string;
   createdById: number;
   createdByName: string;
@@ -120,6 +123,7 @@ export type OrderRecord = {
   itemName: string;
   categoryId: number;
   categoryName: string;
+  variant?: string | null;
   qty: number;
   status: OrderStatus;
   summary: string;

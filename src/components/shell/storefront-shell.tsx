@@ -92,6 +92,8 @@ export function StorefrontShell({
     loading: authLoading,
   } = useAuth();
   const { cart } = useCart();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const { beginNavigation, start, stop } = useAppLoading();
   const router = useRouter();
   const pathname = usePathname();
@@ -292,8 +294,8 @@ export function StorefrontShell({
             >
               <ShoppingCart className="h-4 w-4 text-[var(--primary)]" />
               <span className="hidden sm:inline">Cart</span>
-              {cartCount > 0 ? (
-                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--primary)] px-1 text-[10px] font-bold text-[var(--header-bg)]">
+              {mounted && cartCount > 0 ? (
+                <span suppressHydrationWarning className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--primary)] px-1 text-[10px] font-bold text-[var(--header-bg)]">
                   {cartCount > 99 ? "99+" : cartCount}
                 </span>
               ) : null}

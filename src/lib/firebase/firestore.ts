@@ -466,62 +466,103 @@ export async function createItem(
     imageCrop?: ItemImageCrop | null;
     images?: Array<{ url: string; crop?: ItemImageCrop | null }>;
     is_permission?: string;
+    hasVariants?: boolean;
+    variants?: string[];
   },
   actor?: ActorInfo,
 ) {
-  let createdId: string | number = "";
   const numericCatId = parseInt(String(values.categoryId), 10) || values.categoryId;
-  
-  await runTransaction(db, async (transaction) => {
-    const counterRef = doc(db, "meta", "counters");
-    const counterDoc = await transaction.get(counterRef);
-    let nextProductIdNum = 1;
-    if (counterDoc.exists() && counterDoc.data().nextProductId) {
-      nextProductIdNum = counterDoc.data().nextProductId;
+  const cleanVariants: string[] = values.hasVariants && Array.isArray(values.variants)
+    ? values.variants.map((v) => String(v).trim()).filter(Boolean)
+    : [];
+
+  // Generate guaranteed unique next productId by scanning all existing items
+  let nextProductIdNum = 1;
+  try {
+    const allItemsSnap = await getDocs(collection(db, "items"));
+    let maxNum = 0;
+    for (const d of allItemsSnap.docs) {
+      const data = d.data();
+      const match = String(data.productId || "").match(/^PD(\d+)$/i);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
     }
-    
-    const productIdStr = `PD${String(nextProductIdNum).padStart(3, "0")}`;
-    
-    const itemRef = doc(collection(db, "items"));
-    createdId = itemRef.id;
-    
-    transaction.set(itemRef, {
-      name: values.name.trim(),
-      productId: productIdStr,
-      description: values.description?.trim() ?? "",
-      categoryId: numericCatId,
-      categoryName: values.categoryName,
-      unit: values.unit.trim(),
-      imageUrl: values.imageUrl ?? null,
-      imagePath: values.imagePath ?? null,
-      imageCrop: values.imageCrop ?? null,
-      images: values.images ?? [],
-      is_permission: values.is_permission === "YES" ? "YES" : "NO",
-      createdById: actor?.actorId ?? null,
-      createdByName: actor?.actorName ?? null,
-      createdByRole: actor?.actorRole ?? null,
-      active: true,
-      deletedAt: null,
-      deletedById: null,
-      deletedByName: null,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-    
-    transaction.set(counterRef, { nextProductId: nextProductIdNum + 1 }, { merge: true });
+    nextProductIdNum = maxNum + 1;
+  } catch (e) {
+    console.warn("Could not calculate max productId:", e);
+  }
+
+  const productIdStr = `PD${String(nextProductIdNum).padStart(3, "0")}`;
+
+  const itemDocRef = await addDoc(collection(db, "items"), {
+    name: values.name.trim(),
+    productId: productIdStr,
+    description: values.description?.trim() ?? "",
+    categoryId: numericCatId,
+    categoryName: values.categoryName,
+    unit: values.unit.trim(),
+    imageUrl: values.imageUrl ?? null,
+    imagePath: values.imagePath ?? null,
+    imageCrop: values.imageCrop ?? null,
+    images: values.images ?? [],
+    is_permission: values.is_permission === "YES" ? "YES" : "NO",
+    hasVariants: Boolean(values.hasVariants && cleanVariants.length > 0),
+    variants: cleanVariants,
+    createdById: actor?.actorId ?? null,
+    createdByName: actor?.actorName ?? null,
+    createdByRole: actor?.actorRole ?? null,
+    active: true,
+    deletedAt: null,
+    deletedById: null,
+    deletedByName: null,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
   });
+
+  const finalItemId = parseInt(String(itemDocRef.id), 10) || itemDocRef.id;
+
+  try {
+    await setDoc(doc(db, "meta", "counters"), { nextProductId: nextProductIdNum + 1 }, { merge: true });
+  } catch (e) {}
+
+  // Auto create 0-qty stock entries for all custom sizes
+  if (cleanVariants.length > 0) {
+    for (const v of cleanVariants) {
+      await addDoc(collection(db, "stockEntries"), {
+        date: new Date().toISOString().slice(0, 10),
+        categoryId: numericCatId,
+        categoryName: values.categoryName,
+        itemId: finalItemId,
+        itemName: values.name.trim(),
+        variant: v,
+        qty: 0,
+        unit: values.unit.trim(),
+        notes: `Initial size ${v} setup`,
+        createdById: actor?.actorId ?? 0,
+        createdByName: actor?.actorName ?? "System",
+        active: true,
+        deletedAt: null,
+        deletedById: null,
+        deletedByName: null,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
+  }
 
   await createAuditLog(
     {
       action: "ITEM_CREATED",
       targetType: "item",
-      targetId: String(createdId),
+      targetId: String(finalItemId),
       message: `Created item ${values.name.trim()}.`,
     },
     actor,
   );
-  emitFirestoreRefresh(["items"]);
-    void syncPublicCatalog();
+  emitFirestoreRefresh(["items", "stockEntries"]);
+  void syncPublicCatalog();
 }
 
 export async function updateItem(
@@ -537,6 +578,8 @@ export async function updateItem(
     imageCrop?: ItemImageCrop | null;
     images?: Array<{ url: string; crop?: ItemImageCrop | null }>;
     is_permission?: string;
+    hasVariants?: boolean;
+    variants?: string[];
     active: boolean;
   },
   actor?: ActorInfo,
@@ -544,6 +587,17 @@ export async function updateItem(
   const numericId = parseInt(String(id), 10) || id;
   const numericCatId = parseInt(String(values.categoryId), 10) || values.categoryId;
   const isActive = values.active !== false;
+
+  // Retrieve existing item to detect newly added or deleted size variants
+  const existingItemSnap = await getDoc(doc(db, "items", numericId));
+  const existingData = existingItemSnap.exists() ? existingItemSnap.data() : null;
+  const oldVariants: string[] = existingData?.variants
+    ? (Array.isArray(existingData.variants) ? existingData.variants : (() => { try { return JSON.parse(existingData.variants); } catch (e) { return []; } })())
+    : [];
+
+  const newVariants: string[] = values.hasVariants && Array.isArray(values.variants)
+    ? values.variants.map((v) => String(v).trim()).filter(Boolean)
+    : [];
 
   await updateDoc(doc(db, "items", numericId), {
     name: values.name.trim(),
@@ -556,12 +610,63 @@ export async function updateItem(
     imageCrop: values.imageCrop ?? null,
     images: values.images ?? [],
     is_permission: values.is_permission === "YES" ? "YES" : "NO",
+    hasVariants: Boolean(values.hasVariants && newVariants.length > 0),
+    variants: newVariants,
     active: isActive,
     deletedAt: isActive ? null : serverTimestamp(),
     deletedById: isActive ? null : actor?.actorId ?? null,
     deletedByName: isActive ? null : actor?.actorName ?? null,
     updatedAt: serverTimestamp(),
   });
+
+  // 1. Auto-create 0-qty stock entry for newly added variants
+  for (const nv of newVariants) {
+    if (!oldVariants.includes(nv)) {
+      const existingEntries = await getDocs(
+        query(
+          collection(db, "stockEntries"),
+          where("itemId", "==", numericId),
+          where("variant", "==", nv),
+          where("deletedAt", "==", null)
+        )
+      );
+      if (existingEntries.empty) {
+        await addDoc(collection(db, "stockEntries"), {
+          date: new Date().toISOString().slice(0, 10),
+          categoryId: numericCatId,
+          categoryName: values.categoryName,
+          itemId: numericId,
+          itemName: values.name.trim(),
+          variant: nv,
+          qty: 0,
+          unit: values.unit.trim(),
+          notes: `Initial size ${nv} setup`,
+          createdById: actor?.actorId ?? 0,
+          createdByName: actor?.actorName ?? "System",
+          active: true,
+          deletedAt: null,
+          deletedById: null,
+          deletedByName: null,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      }
+    }
+  }
+
+  // 2. Permanently cascade delete stock entries for sizes removed during edit
+  const deletedVariants = oldVariants.filter((ov) => !newVariants.includes(ov));
+  if (deletedVariants.length > 0) {
+    const allStockSnap = await getDocs(
+      query(collection(db, "stockEntries"), where("itemId", "==", numericId))
+    );
+    for (const docSnap of allStockSnap.docs) {
+      const data = docSnap.data();
+      if (data.variant && deletedVariants.includes(String(data.variant).trim())) {
+        await deleteDoc(doc(db, "stockEntries", docSnap.id));
+      }
+    }
+  }
 
   await createAuditLog(
     {
@@ -574,12 +679,14 @@ export async function updateItem(
     },
     actor,
   );
-  emitFirestoreRefresh(["items"]);
-    void syncPublicCatalog();
+  emitFirestoreRefresh(["items", "stockEntries"]);
+  void syncPublicCatalog();
 }
 
 export async function deleteItem(id: number, actor?: ActorInfo) {
-  await updateDoc(doc(db, "items", id), {
+  const numericId = parseInt(String(id), 10) || id;
+
+  await updateDoc(doc(db, "items", numericId), {
     active: false,
     deletedAt: serverTimestamp(),
     deletedById: actor?.actorId ?? null,
@@ -587,19 +694,32 @@ export async function deleteItem(id: number, actor?: ActorInfo) {
     updatedAt: serverTimestamp(),
   });
 
+  // Cascade delete all stock entries associated with this item
+  const allStockSnap = await getDocs(
+    query(collection(db, "stockEntries"), where("itemId", "==", numericId))
+  );
+  for (const sDoc of allStockSnap.docs) {
+    await updateDoc(doc(db, "stockEntries", sDoc.id), {
+      active: false,
+      deletedAt: serverTimestamp(),
+      deletedById: actor?.actorId ?? null,
+      deletedByName: actor?.actorName ?? null,
+      updatedAt: serverTimestamp(),
+    });
+  }
+
   await createAuditLog(
     {
       action: "ITEM_SOFT_DELETED",
       targetType: "item",
-      targetId: id,
-      message: "Soft deleted item.",
+      targetId: numericId,
+      message: "Soft deleted item and associated stock entries.",
     },
     actor,
   );
 
-
-
-  emitFirestoreRefresh(["stockEntries"]);
+  emitFirestoreRefresh(["items", "stockEntries"]);
+  void syncPublicCatalog();
 }
 
 export async function recoverItem(id: number, actor?: ActorInfo) {

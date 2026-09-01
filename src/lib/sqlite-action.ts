@@ -1,8 +1,8 @@
 "use server";
 import { db } from "./sqlite-db";
 
-const jsonFields = ["roles", "assignedCategoryIds", "images", "imageCrop"];
-const booleanFields = ["temporaryPasswordIssued"];
+const jsonFields = ["roles", "assignedCategoryIds", "images", "imageCrop", "variants"];
+const booleanFields = ["temporaryPasswordIssued", "hasVariants"];
 
 const removedFields: Record<string, string[]> = {
   users: ['usernameLower', 'deletedByName', 'primaryRole', 'categoryIds'],
@@ -41,8 +41,8 @@ function parseRow(row: any) {
   }
 
   for (const field of booleanFields) {
-    if (parsed[field] !== undefined) {
-      parsed[field] = parsed[field] === 1;
+    if (parsed[field] !== undefined && parsed[field] !== null) {
+      parsed[field] = parsed[field] === 1 || parsed[field] === "1" || parsed[field] === true;
     }
   }
   

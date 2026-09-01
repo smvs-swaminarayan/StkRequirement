@@ -19,6 +19,21 @@ function getDbInstance() {
         `);
         const tableInfo = _dbInstance.prepare("PRAGMA table_info(items)").all() as Array<{ name: string }>;
         const hasIsPermission = tableInfo.some((col: any) => col.name === "is_permission");
+        const hasVariants = tableInfo.some((col: any) => col.name === "hasVariants");
+        if (!hasVariants) {
+          _dbInstance.prepare("ALTER TABLE items ADD COLUMN hasVariants INTEGER DEFAULT 0").run();
+          _dbInstance.prepare("ALTER TABLE items ADD COLUMN variants TEXT DEFAULT '[]'").run();
+        }
+        try {
+          const stockTableInfo = _dbInstance.prepare("PRAGMA table_info(stockEntries)").all() as Array<{ name: string }>;
+          if (!stockTableInfo.some((col: any) => col.name === "variant")) {
+            _dbInstance.prepare("ALTER TABLE stockEntries ADD COLUMN variant TEXT DEFAULT ''").run();
+          }
+          const orderTableInfo = _dbInstance.prepare("PRAGMA table_info(orders)").all() as Array<{ name: string }>;
+          if (!orderTableInfo.some((col: any) => col.name === "variant")) {
+            _dbInstance.prepare("ALTER TABLE orders ADD COLUMN variant TEXT DEFAULT ''").run();
+          }
+        } catch (colErr) {}
         if (!hasIsPermission) {
           _dbInstance.prepare("ALTER TABLE items ADD COLUMN is_permission TEXT DEFAULT 'NO'").run();
         }

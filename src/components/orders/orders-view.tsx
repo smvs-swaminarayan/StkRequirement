@@ -9,7 +9,7 @@ import { ManagerOrdersWorkspace } from "@/components/orders/manager-orders-works
 import { UserOrdersWorkspace } from "@/components/orders/user-orders-workspace";
 
 export function OrdersView({
-  userView = "catalog",
+  userView = "history",
 }: {
   userView?: "catalog" | "history" | "cart";
 }) {

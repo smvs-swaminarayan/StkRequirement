@@ -25,7 +25,7 @@ const ASPECT_MAP: Record<string, number> = {
   wide: 16 / 9,
 };
 
-export function ImageCropEditor({ imageUrl, crop, onChange, onRemove }: ImageCropEditorProps) {
+export function ImageCropEditor({ imageUrl, crop, onChange, onSave: onSaveProp, onRemove }: ImageCropEditorProps) {
   const normalizedCrop = useMemo(() => normalizeItemImageCrop(crop), [crop]);
   const [open, setOpen] = useState(false);
 

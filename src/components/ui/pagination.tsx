@@ -3,25 +3,28 @@
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface PaginationProps {
-  currentPage: number;
-  totalItems: number;
-  pageSize: number;
-  onPageChange: (page: number) => void;
+export interface PaginationProps {
+  currentPage?: number;
+  page?: number;
+  totalItems?: number;
+  total?: number;
+  pageSize?: number;
+  onPageChange?: (page: number) => void;
+  onChange?: (page: number) => void;
   onPageSizeChange?: (pageSize: number) => void;
   pageSizeOptions?: number[];
   className?: string;
 }
 
-export function Pagination({
-  currentPage,
-  totalItems,
-  pageSize,
-  onPageChange,
-  onPageSizeChange,
-  pageSizeOptions = [10, 25, 50, 100],
-  className,
-}: PaginationProps) {
+export function Pagination(props: PaginationProps) {
+  const currentPage = Math.max(1, Number(props.currentPage ?? props.page ?? 1));
+  const totalItems = Math.max(0, Number(props.totalItems ?? props.total ?? 0));
+  const pageSize = Math.max(1, Number(props.pageSize ?? 10));
+  const onPageChange = props.onPageChange ?? props.onChange ?? (() => {});
+  const onPageSizeChange = props.onPageSizeChange;
+  const pageSizeOptions = props.pageSizeOptions ?? [10, 25, 50, 100];
+  const className = props.className;
+
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const startItem = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endItem = Math.min(totalItems, currentPage * pageSize);
@@ -60,9 +63,9 @@ export function Pagination({
       {/* Left: Summary and Page Size */}
       <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--ink-soft)]">
         <span>
-          Showing <strong className="font-bold text-[var(--ink)]">{startItem}</strong> to{" "}
-          <strong className="font-bold text-[var(--ink)]">{endItem}</strong> of{" "}
-          <strong className="font-bold text-[var(--ink)]">{totalItems}</strong> entries
+          Showing <strong className="font-bold text-[var(--ink)]">{String(startItem)}</strong> to{" "}
+          <strong className="font-bold text-[var(--ink)]">{String(endItem)}</strong> of{" "}
+          <strong className="font-bold text-[var(--ink)]">{String(totalItems)}</strong> entries
         </span>
 
         {onPageSizeChange ? (
@@ -100,58 +103,52 @@ export function Pagination({
           <ChevronsLeft className="h-3.5 w-3.5" />
         </button>
 
-        {/* Previous */}
+        {/* Previous Page */}
         <button
           type="button"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage <= 1}
-          className="flex h-8 items-center gap-1 rounded border border-[var(--border)] bg-white px-2.5 text-xs font-semibold text-[var(--ink-soft)] transition hover:bg-[var(--paper)] hover:text-[var(--ink)] disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-[var(--ink-soft)]"
+          className="flex h-8 w-8 items-center justify-center rounded border border-[var(--border)] bg-white text-[var(--ink-soft)] transition hover:bg-[var(--paper)] hover:text-[var(--ink)] disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-[var(--ink-soft)]"
+          title="Previous Page"
         >
           <ChevronLeft className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Prev</span>
         </button>
 
-        {/* Page Numbers */}
-        <div className="flex items-center gap-1">
-          {getPageNumbers().map((page, idx) => {
-            if (page === "ellipsis") {
-              return (
-                <span
-                  key={`ellipsis-${idx}`}
-                  className="flex h-8 w-6 items-center justify-center text-xs text-[var(--ink-light)]"
-                >
-                  ...
-                </span>
-              );
-            }
-
-            const isActive = page === currentPage;
+        {/* Page numbers */}
+        {getPageNumbers().map((p, idx) => {
+          if (p === "ellipsis") {
             return (
-              <button
-                key={`page-${page}`}
-                type="button"
-                onClick={() => onPageChange(page)}
-                className={cn(
-                  "flex h-8 min-w-8 items-center justify-center rounded px-2 text-xs font-bold transition",
-                  isActive
-                    ? "border border-[var(--primary)] bg-[var(--primary)] text-white shadow-sm"
-                    : "border border-[var(--border)] bg-white text-[var(--ink)] hover:bg-[var(--paper)]",
-                )}
-              >
-                {page}
-              </button>
+              <span key={`ellipsis-${idx}`} className="px-2 text-xs text-[var(--ink-soft)]">
+                ...
+              </span>
             );
-          })}
-        </div>
+          }
+          const isCurrent = p === currentPage;
+          return (
+            <button
+              key={p}
+              type="button"
+              onClick={() => onPageChange(p)}
+              className={cn(
+                "flex h-8 min-w-[32px] items-center justify-center rounded px-2 text-xs font-bold transition",
+                isCurrent
+                  ? "bg-amber-500 text-white shadow-xs"
+                  : "border border-[var(--border)] bg-white text-[var(--ink)] hover:bg-[var(--paper)]",
+              )}
+            >
+              {p}
+            </button>
+          );
+        })}
 
-        {/* Next */}
+        {/* Next Page */}
         <button
           type="button"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage >= totalPages}
-          className="flex h-8 items-center gap-1 rounded border border-[var(--border)] bg-white px-2.5 text-xs font-semibold text-[var(--ink-soft)] transition hover:bg-[var(--paper)] hover:text-[var(--ink)] disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-[var(--ink-soft)]"
+          className="flex h-8 w-8 items-center justify-center rounded border border-[var(--border)] bg-white text-[var(--ink-soft)] transition hover:bg-[var(--paper)] hover:text-[var(--ink)] disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-[var(--ink-soft)]"
+          title="Next Page"
         >
-          <span className="hidden sm:inline">Next</span>
           <ChevronRight className="h-3.5 w-3.5" />
         </button>
 

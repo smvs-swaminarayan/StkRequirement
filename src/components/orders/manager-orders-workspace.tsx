@@ -1,4 +1,6 @@
 "use client";
+
+import { matchesSearch } from "@/lib/gujarati-search";
 /* eslint-disable @next/next/no-img-element */
 
 import { useDeferredValue, useMemo, useState } from "react";
@@ -29,7 +31,7 @@ const orderStatuses = ["ALL", "PENDING", "APPROVED", "REJECTED", "DELIVERED"] as
 
 export function ManagerOrdersWorkspace() {
   const { workspaceProfile: profile } = useAuth();
-  const { categories, items, orders } = useWorkspaceData();
+  const { categories, items, orders, stockEntries } = useWorkspaceData();
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
   const [statusFilter, setStatusFilter] = useState<(typeof orderStatuses)[number]>("ALL");
@@ -169,6 +171,7 @@ export function ManagerOrdersWorkspace() {
                 {paginatedOrders.map((order) => {
                   const orderItem = items.find((item) => item.id === order.itemId);
                   const isDelivered = order.status === "DELIVERED";
+                  const isRejected = order.status === "REJECTED";
 
                   return (
                     <article
@@ -203,8 +206,13 @@ export function ManagerOrdersWorkspace() {
                                   </span>
                                 ) : null}
                               </div>
-                              <h4 className="text-sm font-bold text-[var(--ink)] truncate group-hover:text-[var(--primary)] transition-colors">
-                                {order.itemName}
+                              <h4 className="text-sm font-bold text-[var(--ink)] truncate group-hover:text-[var(--primary)] transition-colors flex items-center gap-1.5">
+                                <span className="truncate">{order.itemName}</span>
+                                {order.variant ? (
+                                  <span className="shrink-0 text-[10px] font-black px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-800 border border-purple-200">
+                                    Size: {order.variant}
+                                  </span>
+                                ) : null}
                               </h4>
                             </div>
                           </div>
@@ -263,7 +271,29 @@ export function ManagerOrdersWorkspace() {
                               e.stopPropagation();
                               setSelectedOrderModal(order);
                             }}
-                            className="mt-2.5 text-xs font-bold text-white underline hover:text-emerald-300"
+                            className="mt-2.5 text-xs font-bold text-white underline hover:text-emerald-300 cursor-pointer"
+                          >
+                            View Full Details
+                          </button>
+                        </div>
+                      )}
+
+                      {/* FROSTED BLUR OVERLAY FOR REJECTED ORDERS (RED THEME) */}
+                      {isRejected && (
+                        <div className="absolute inset-0 bg-rose-950/70 backdrop-blur-[2.5px] rounded-xl flex flex-col items-center justify-center z-10 p-3 text-center transition group-hover:bg-rose-950/60">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-600 text-white text-xs font-extrabold uppercase tracking-wider shadow-lg border border-rose-500">
+                            <XCircle className="h-3.5 w-3.5" /> REJECTED
+                          </span>
+                          <span className="mt-1.5 text-[11px] font-semibold text-rose-200">
+                            {formatDate(order.rejectedAt || order.updatedAt)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedOrderModal(order);
+                            }}
+                            className="mt-2.5 text-xs font-bold text-white underline hover:text-rose-200 cursor-pointer"
                           >
                             View Full Details
                           </button>
@@ -300,13 +330,22 @@ export function ManagerOrdersWorkspace() {
         open={selectedOrderModal !== null}
         onClose={() => setSelectedOrderModal(null)}
         title={selectedOrderModal ? `Order #${selectedOrderModal.id} Details` : "Order Details"}
-        description={selectedOrderModal ? `${selectedOrderModal.categoryName} • ${selectedOrderModal.itemName}` : ""}
+        description={selectedOrderModal ? `${selectedOrderModal.categoryName} • ${selectedOrderModal.itemName} ${selectedOrderModal.variant ? `[Size: ${selectedOrderModal.variant}]` : ""}` : ""}
       >
         {selectedOrderModal ? (
           <div className="space-y-4">
             <div className="flex items-center justify-between p-3 rounded-lg bg-[var(--paper)] border border-[var(--border)]">
               <div>
-                <p className="text-sm font-bold text-[var(--ink)]">{selectedOrderModal.itemName}</p>
+                <div className="space-y-1">
+      <div className="flex items-center gap-2.5 flex-wrap">
+        <span className="text-base font-extrabold text-[var(--ink)]">{selectedOrderModal.itemName}</span>
+        {selectedOrderModal.variant ? (
+          <span className="text-xs font-black px-3 py-1 rounded-xl bg-purple-600 text-white shadow-xs border border-purple-700">
+            👕 Size: {selectedOrderModal.variant}
+          </span>
+        ) : null}
+      </div>
+    </div>
                 <p className="text-xs text-[var(--ink-soft)]">Requested by: <span className="font-semibold text-[var(--ink)]">{selectedOrderModal.requestedByName}</span></p>
               </div>
               <StatusBadge status={selectedOrderModal.status} />
@@ -409,6 +448,7 @@ export function ManagerOrdersWorkspace() {
       >
         <div className="space-y-4">
           {decisionState ? (
+            <>
             <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--paper)] p-4">
               <div className="flex items-center gap-2 text-sm font-bold text-[var(--ink)]">
                 {(() => {
@@ -419,6 +459,47 @@ export function ManagerOrdersWorkspace() {
               </div>
               <p className="mt-2 text-sm text-[var(--ink-soft)]">{defaultDecisionPreview}</p>
             </div>
+            {decisionState.nextStatus === "APPROVED" && (() => {
+              const matchedItem = items.find(i => String(i.id) === String(selectedOrderModal?.itemId));
+              const orderVariant = selectedOrderModal?.variant?.trim();
+              
+              // Calculate physical stock in warehouse (Stock In - Already Delivered/Approved)
+              const relevantStockEntries = stockEntries.filter(
+                s => String(s.itemId) === String(selectedOrderModal?.itemId) &&
+                (!orderVariant || (s.variant && s.variant.trim() === orderVariant))
+              );
+              const totalStockIn = relevantStockEntries.reduce((sum, s) => sum + Number(s.qty || 0), 0);
+              
+              const relevantApprovedOrders = orders.filter(
+                o => String(o.itemId) === String(selectedOrderModal?.itemId) &&
+                (!orderVariant || (o.variant && o.variant.trim() === orderVariant)) &&
+                (o.status === "APPROVED" || o.status === "DELIVERED") &&
+                o.id !== selectedOrderModal?.id
+              );
+              const totalApprovedOut = relevantApprovedOrders.reduce((sum, o) => sum + Number(o.qty || 0), 0);
+              const physicalLeft = Math.max(0, totalStockIn - totalApprovedOut);
+              const needed = Number(selectedOrderModal?.qty || 1);
+              const isInsufficient = needed > physicalLeft;
+
+              return (
+                <div className={`p-3 rounded-xl border text-xs ${isInsufficient ? 'bg-rose-50 border-rose-300 text-rose-800' : 'bg-emerald-50 border-emerald-300 text-emerald-800'}`}>
+                  <div className="font-bold flex items-center justify-between">
+                    <span>📦 Warehouse Physical Stock {orderVariant ? `(Size: ${orderVariant})` : ''}:</span>
+                    <span className="text-sm font-extrabold">{physicalLeft} units</span>
+                  </div>
+                  {isInsufficient ? (
+                    <p className="mt-1 text-rose-700 font-medium">
+                      ⚠️ Warning: Insufficient physical stock ({physicalLeft} left, order requires {needed}). Restock item or reject order.
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-emerald-700 font-medium">
+                      ✓ Stock available to fulfill this order ({physicalLeft} units in warehouse).
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
+            </>
           ) : null}
 
           <label className="block text-sm font-semibold text-[var(--ink)]">

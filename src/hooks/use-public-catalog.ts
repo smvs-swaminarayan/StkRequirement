@@ -15,7 +15,7 @@ const CATALOG_POLL_MS = 60000;
  * Stock comes from `/api/stock-availability` via `usePublicStockAvailability`.
  */
 export function usePublicCatalog(selectedCategoryId?: string) {
-  const { stockMap, getAvailableStock } = usePublicStockAvailability();
+  const { stockMap, variantMap, getAvailableStock } = usePublicStockAvailability();
   const [categories, setCategories] = useState<WithId<CategoryRecord>[]>([]);
   const [items, setItems] = useState<WithId<ItemRecord>[]>([]);
   const [loading, setLoading] = useState(true);
