@@ -4,7 +4,7 @@ import { matchesSearch } from "@/lib/gujarati-search";
 /* eslint-disable @next/next/no-img-element */
 
 import { useDeferredValue, useMemo, useState } from "react";
-import { ArrowRight, PackageCheck, Eye, CheckCircle2, XCircle, Truck } from "lucide-react";
+import { ArrowRight, PackageCheck, Eye, CheckCircle2, XCircle, Printer, CheckSquare, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
@@ -39,6 +39,7 @@ export function ManagerOrdersWorkspace() {
   const [pageSize, setPageSize] = useState(12);
   const [submitting, setSubmitting] = useState(false);
   const [selectedOrderModal, setSelectedOrderModal] = useState<OrderRecord | null>(null);
+  const [printModalOpen, setPrintModalOpen] = useState(false);
   const [decisionState, setDecisionState] = useState<{
     orderId: string;
     itemName: string;
@@ -142,19 +143,19 @@ export function ManagerOrdersWorkspace() {
                 Review requests, approve/reject, and mark deliveries.
               </p>
             </div>
-            <div className="grid gap-2 sm:grid-cols-[200px_160px]">
+            <div className="flex flex-wrap items-center gap-2">
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search orders..."
-                className="stk-input"
+                className="stk-input sm:w-[200px]"
               />
               <select
                 value={statusFilter}
                 onChange={(event) =>
                   setStatusFilter(event.target.value as (typeof orderStatuses)[number])
                 }
-                className="stk-select"
+                className="stk-select sm:w-[150px]"
               >
                 {orderStatuses.map((status) => (
                   <option key={status} value={status}>
@@ -162,6 +163,14 @@ export function ManagerOrdersWorkspace() {
                   </option>
                 ))}
               </select>
+              <button
+                type="button"
+                onClick={() => setPrintModalOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2 text-xs font-bold text-amber-900 shadow-2xs hover:bg-amber-600 hover:text-white hover:border-amber-600 transition cursor-pointer"
+                title="Print filtered orders list for store picking"
+              >
+                <Printer className="h-4 w-4" /> Print Orders List
+              </button>
             </div>
           </div>
 
@@ -313,7 +322,142 @@ export function ManagerOrdersWorkspace() {
                   pageSizeOptions={[8, 12, 24, 48]}
                 />
               </div>
-            </>
+                  {/* 🖨️ PRINTABLE ORDER PICKING SLIP MODAL */}
+      <Modal
+        open={printModalOpen}
+        onClose={() => setPrintModalOpen(false)}
+        title="🖨️ Print Store Picking Slip"
+        description="Print a high-contrast physical checklist of filtered orders to pick items in the store."
+      >
+        <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+          {/* Print Summary Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200 text-xs">
+            <div>
+              <span className="font-extrabold text-amber-950">Active Filter: </span>
+              <span className="font-bold text-amber-800 uppercase bg-amber-100 px-2 py-0.5 rounded-md">
+                {statusFilter === "ALL" ? "All Orders" : statusFilter}
+              </span>
+            </div>
+            <div className="flex items-center gap-3 font-bold text-gray-700">
+              <span>Orders: <strong className="text-gray-900">{filteredOrders.length}</strong></span>
+              <span>•</span>
+              <span>Total Units: <strong className="text-gray-900">{filteredOrders.reduce((sum, o) => sum + (Number(o.qty) || 1), 0)}</strong></span>
+            </div>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs shadow-sm transition cursor-pointer"
+            >
+              <Printer className="w-4 h-4" /> Print Slip Now
+            </button>
+          </div>
+
+          {/* Printable Document Preview Area */}
+          <div id="stk-print-area" className="p-4 bg-white border border-gray-200 rounded-xl space-y-4">
+            <div className="border-b border-gray-300 pb-3 flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-black tracking-wide text-gray-900 uppercase">
+                  STK Requirement — Store Order Fulfillment Slip
+                </h2>
+                <p className="text-[11px] text-gray-500 font-semibold mt-0.5">
+                  Generated on: {new Date().toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} | Filter: {statusFilter}
+                </p>
+              </div>
+              <div className="text-right">
+                <span className="text-xs font-black bg-gray-100 border border-gray-300 px-2.5 py-1 rounded">
+                  {filteredOrders.length} Orders ({filteredOrders.reduce((sum, o) => sum + (Number(o.qty) || 1), 0)} Units)
+                </span>
+              </div>
+            </div>
+
+            {filteredOrders.length === 0 ? (
+              <p className="text-center py-6 text-xs text-gray-500 font-bold">No orders match the current filter.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b-2 border-gray-800 bg-gray-50 text-[11px] font-black uppercase text-gray-800">
+                      <th className="py-2 px-2 text-center w-10">Done</th>
+                      <th className="py-2 px-2 w-8">#</th>
+                      <th className="py-2 px-3">Item & Size Details</th>
+                      <th className="py-2 px-2">Category</th>
+                      <th className="py-2 px-2 text-center">Qty</th>
+                      <th className="py-2 px-3">Requested By (User)</th>
+                      <th className="py-2 px-2">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredOrders.map((ord, idx) => (
+                      <tr key={ord.id} className="hover:bg-gray-50/50">
+                        <td className="py-2 px-2 text-center">
+                          <div className="h-4 w-4 mx-auto rounded border border-gray-400"></div>
+                        </td>
+                        <td className="py-2 px-2 font-bold text-gray-500">{idx + 1}</td>
+                        <td className="py-2 px-3">
+                          <p className="font-extrabold text-gray-900">{ord.itemName}</p>
+                          {ord.variant ? (
+                            <span className="inline-block mt-0.5 text-[10px] font-black text-purple-900 bg-purple-100 border border-purple-200 px-1.5 py-0.2 rounded">
+                              Size: {ord.variant}
+                            </span>
+                          ) : null}
+                          {ord.notes ? (
+                            <p className="text-[10px] text-gray-500 italic mt-0.5">Note: {ord.notes}</p>
+                          ) : null}
+                        </td>
+                        <td className="py-2 px-2 text-[11px] text-gray-700 font-semibold">{ord.categoryName}</td>
+                        <td className="py-2 px-2 text-center font-black text-xs text-gray-900">{ord.qty}</td>
+                        <td className="py-2 px-3 font-bold text-gray-800 text-xs">{ord.requestedByName || "User"}</td>
+                        <td className="py-2 px-2 text-[10px] text-gray-600 font-medium">{formatDate(ord.date || ord.createdAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2.5 pt-2 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={() => setPrintModalOpen(false)}
+              className="px-4 py-2 text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition cursor-pointer"
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="px-5 py-2 text-xs font-black text-white bg-amber-600 hover:bg-amber-700 rounded-xl transition cursor-pointer shadow-xs flex items-center gap-1.5"
+            >
+              <Printer className="w-4 h-4" /> Print Document
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Embedded CSS for pristine browser printing */}
+      <style jsx global>{`
+        @media print {
+          body * {
+            visibility: hidden !important;
+          }
+          #stk-print-area, #stk-print-area * {
+            visibility: visible !important;
+          }
+          #stk-print-area {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 15px !important;
+            border: none !important;
+            box-shadow: none !important;
+            background: white !important;
+          }
+        }
+      `}</style>
+    </>
           ) : (
             <div className="mt-4">
               <EmptyState
